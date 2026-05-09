@@ -5,12 +5,19 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { CarModel } from "@/data/models";
+import type { WheelStyle } from "./CustomizationApp";
 
 type Props = {
   model: CarModel;
   modelPath?: string;
   exteriorColor?: string;
   interiorColor?: string;
+  wheelColor?: string;
+  wheelStyle?: WheelStyle;
+  doorsOpen?: boolean;
+  windowsDown?: boolean;
+  lightsOn?: boolean;
+  wheelFocusKey?: number;
 };
 
 const pathMap: Record<string, string> = {
@@ -28,19 +35,20 @@ const SCENE_BACKGROUND = 0x050915;
  * 车模型整体大小。
  * 数值越大，模型越大。
  */
-const MODEL_TARGET_SIZE = 8.2;
+const MODEL_TARGET_SIZE = 9.6;
 
 /**
  * 相机距离系数。
  * 数值越小，车越大。
  */
-const CAMERA_PADDING = 0.62;
+const CAMERA_PADDING = 0.46;
 
 /**
  * 车在画面里的填充比例。
  * 数值越大，车越撑满画布。
  */
 const CAMERA_FILL_RATIO = 0.78;
+const KEYBOARD_TRANSLATE_STEP = 0.22;
 
 const FLOOR_TOP_Y = -0.42;
 const MODEL_FLOOR_GAP = 0.02;
@@ -79,6 +87,12 @@ export default function CustomizationViewer({
   modelPath,
   exteriorColor,
   interiorColor,
+  wheelColor,
+  wheelStyle = "classic",
+  doorsOpen = false,
+  windowsDown = false,
+  lightsOn = false,
+  wheelFocusKey = 0,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
 
@@ -87,6 +101,7 @@ export default function CustomizationViewer({
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const modelRef = useRef<THREE.Group | null>(null);
+  const stageRef = useRef<THREE.Group | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -94,11 +109,24 @@ export default function CustomizationViewer({
 
   const exteriorColorRef = useRef<string | undefined>(exteriorColor);
   const interiorColorRef = useRef<string | undefined>(interiorColor);
+  const wheelColorRef = useRef<string | undefined>(wheelColor);
+  const wheelStyleRef = useRef<WheelStyle>(wheelStyle);
+  const doorsOpenRef = useRef(doorsOpen);
+  const windowsDownRef = useRef(windowsDown);
+  const lightsOnRef = useRef(lightsOn);
+  const previousInteriorColorRef = useRef<string | undefined>(interiorColor);
+  const previousWheelColorRef = useRef<string | undefined>(wheelColor);
+  const previousWheelStyleRef = useRef<WheelStyle>(wheelStyle);
 
   useEffect(() => {
     exteriorColorRef.current = exteriorColor;
     interiorColorRef.current = interiorColor;
-  }, [exteriorColor, interiorColor]);
+    wheelColorRef.current = wheelColor;
+    wheelStyleRef.current = wheelStyle;
+    doorsOpenRef.current = doorsOpen;
+    windowsDownRef.current = windowsDown;
+    lightsOnRef.current = lightsOn;
+  }, [exteriorColor, interiorColor, wheelColor, wheelStyle, doorsOpen, windowsDown, lightsOn]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -111,7 +139,7 @@ export default function CustomizationViewer({
     const width = Math.max(host.clientWidth, 1);
     const height = Math.max(host.clientHeight, 1);
 
-    const camera = new THREE.PerspectiveCamera(25, width / height, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(22, width / height, 0.1, 1000);
     camera.position.set(0, 1.2, 10);
     cameraRef.current = camera;
 
@@ -126,7 +154,7 @@ export default function CustomizationViewer({
     renderer.setClearColor(SCENE_BACKGROUND, 1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.22;
 
     if ("physicallyCorrectLights" in renderer) {
       (renderer as any).physicallyCorrectLights = true;
@@ -140,7 +168,10 @@ export default function CustomizationViewer({
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enablePan = false;
+    controls.enableRotate = true;
     controls.enableZoom = true;
+    controls.rotateSpeed = 0.7;
+    controls.zoomSpeed = 0.9;
     controls.enableDamping = true;
     controls.dampingFactor = 0.12;
     controls.autoRotate = false;
@@ -149,12 +180,34 @@ export default function CustomizationViewer({
 
     controlsRef.current = controls;
 
-    const hemi = new THREE.HemisphereLight("#9fc6ff", "#08101f", 1.4);
+    const hemi = new THREE.HemisphereLight("#eef6ff", "#101a2c", 2.15);
     scene.add(hemi);
 
+    const ambientFill = new THREE.AmbientLight("#dcecff", 0.72);
+    scene.add(ambientFill);
+
+    const overheadFill = new THREE.DirectionalLight("#ffffff", 3.35);
+    overheadFill.position.set(0, 10.5, 2.2);
+    scene.add(overheadFill);
+
+    const frontPanelFill = new THREE.DirectionalLight("#d7ecff", 1.65);
+    frontPanelFill.position.set(0, 4.4, 8.8);
+    scene.add(frontPanelFill);
+
+    const topDownSpot = new THREE.SpotLight(
+      "#ffffff",
+      640,
+      22,
+      Math.PI / 4.4,
+      0.5,
+      0.92,
+    );
+    topDownSpot.position.set(0, 9.8, 1.2);
+    scene.add(topDownSpot);
+
     const keyLight = new THREE.SpotLight(
-      "#8dbbff",
-      430,
+      "#b9d8ff",
+      560,
       30,
       Math.PI / 5,
       0.35,
@@ -165,7 +218,7 @@ export default function CustomizationViewer({
 
     const rimLight = new THREE.SpotLight(
       "#ffffff",
-      240,
+      320,
       24,
       Math.PI / 6,
       0.4,
@@ -173,6 +226,11 @@ export default function CustomizationViewer({
     );
     rimLight.position.set(5.5, 5.2, -5.8);
     scene.add(rimLight);
+
+    const stageGroup = new THREE.Group();
+    stageGroup.name = "__customization_stage";
+    stageRef.current = stageGroup;
+    scene.add(stageGroup);
 
     const floor = new THREE.Mesh(
       new THREE.CylinderGeometry(6.8, 7.2, 0.32, 160),
@@ -183,7 +241,7 @@ export default function CustomizationViewer({
       }),
     );
     floor.position.y = -0.56;
-    scene.add(floor);
+    stageGroup.add(floor);
 
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(6.95, 0.04, 12, 192),
@@ -193,7 +251,7 @@ export default function CustomizationViewer({
     );
     ring.rotation.x = Math.PI / 2;
     ring.position.y = -0.4;
-    scene.add(ring);
+    stageGroup.add(ring);
 
     const innerRing = new THREE.Mesh(
       new THREE.TorusGeometry(4.9, 0.02, 8, 160),
@@ -205,18 +263,11 @@ export default function CustomizationViewer({
     );
     innerRing.rotation.x = Math.PI / 2;
     innerRing.position.y = -0.37;
-    scene.add(innerRing);
+    stageGroup.add(innerRing);
 
-    const clock = new THREE.Clock();
     let rafId: number | null = null;
 
     const animate = () => {
-      const t = clock.getElapsedTime();
-
-      if (modelRef.current) {
-        modelRef.current.rotation.y = Math.sin(t * 0.25) * 0.06;
-      }
-
       controls.update();
       renderer.render(scene, camera);
 
@@ -237,6 +288,44 @@ export default function CustomizationViewer({
       }
     };
 
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableKeyboardTarget(event.target)) return;
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        orbitCameraWithKeyboard(camera, controls, -0.14, 0);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        orbitCameraWithKeyboard(camera, controls, 0.14, 0);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        orbitCameraWithKeyboard(camera, controls, 0, -0.1);
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        orbitCameraWithKeyboard(camera, controls, 0, 0.1);
+      } else if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        zoomCameraWithKeyboard(camera, controls, 0.84);
+      } else if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        zoomCameraWithKeyboard(camera, controls, 1.18);
+      } else if (event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        translateModelWithKeyboard(camera, modelRef.current, stageRef.current, -KEYBOARD_TRANSLATE_STEP, 0);
+      } else if (event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        translateModelWithKeyboard(camera, modelRef.current, stageRef.current, KEYBOARD_TRANSLATE_STEP, 0);
+      } else if (event.key.toLowerCase() === "w") {
+        event.preventDefault();
+        translateModelWithKeyboard(camera, modelRef.current, stageRef.current, 0, KEYBOARD_TRANSLATE_STEP);
+      } else if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        translateModelWithKeyboard(camera, modelRef.current, stageRef.current, 0, -KEYBOARD_TRANSLATE_STEP);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
     let resizeObserver: ResizeObserver | null = null;
 
     if (typeof ResizeObserver !== "undefined") {
@@ -256,6 +345,8 @@ export default function CustomizationViewer({
         window.removeEventListener("resize", onResize);
       }
 
+      window.removeEventListener("keydown", onKeyDown);
+
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
       }
@@ -270,6 +361,7 @@ export default function CustomizationViewer({
       renderer.dispose();
 
       modelRef.current = null;
+      stageRef.current = null;
       sceneRef.current = null;
       rendererRef.current = null;
       cameraRef.current = null;
@@ -361,11 +453,16 @@ export default function CustomizationViewer({
           exteriorColorRef.current,
           interiorColorRef.current,
         );
+        applyWheelCustomization(group, wheelColorRef.current, wheelStyleRef.current);
+        applyDoorState(group, doorsOpenRef.current);
+        applyWindowState(group, windowsDownRef.current);
 
         /**
-         * 把车灯发光效果嵌入真实 m4car_emissive1 车灯 mesh。
+         * 把车灯发光效果嵌入真实 m4car_emissive1 车灯 mesh，并用可控光源补强。
          */
         applyEmbeddedCarLights(modelScene, originalBox);
+        setEmbeddedLightVisibility(group, lightsOnRef.current);
+        applySimulatedHeadlights(group, lightsOnRef.current);
 
         if (cameraRef.current) {
           fitCameraToObject(group, cameraRef.current, controlsRef.current);
@@ -406,13 +503,74 @@ export default function CustomizationViewer({
     if (!modelRef.current) return;
 
     applyColorsToScene(modelRef.current, exteriorColor, interiorColor);
+    applyDoorState(modelRef.current, doorsOpenRef.current);
+
+    if (interiorColor && previousInteriorColorRef.current !== interiorColor) {
+      focusCameraOnInterior(modelRef.current, cameraRef.current, controlsRef.current);
+    }
+
+    previousInteriorColorRef.current = interiorColor;
   }, [exteriorColor, interiorColor]);
+
+  useEffect(() => {
+    if (!modelRef.current) return;
+
+    applyWheelCustomization(modelRef.current, wheelColor, wheelStyle);
+
+    if (
+      (wheelColor && previousWheelColorRef.current !== wheelColor) ||
+      previousWheelStyleRef.current !== wheelStyle
+    ) {
+      focusCameraOnWheels(modelRef.current, cameraRef.current, controlsRef.current);
+    }
+
+    previousWheelColorRef.current = wheelColor;
+    previousWheelStyleRef.current = wheelStyle;
+  }, [wheelColor, wheelStyle]);
+
+  useEffect(() => {
+    if (!modelRef.current || wheelFocusKey === 0) return;
+
+    focusCameraOnWheels(modelRef.current, cameraRef.current, controlsRef.current);
+  }, [wheelFocusKey]);
+
+  useEffect(() => {
+    if (!modelRef.current) return;
+
+    applyDoorState(modelRef.current, doorsOpen);
+
+    if (doorsOpen) {
+      focusCameraOnDoors(modelRef.current, cameraRef.current, controlsRef.current);
+    }
+  }, [doorsOpen]);
+
+  useEffect(() => {
+    if (!modelRef.current) return;
+
+    applyWindowState(modelRef.current, windowsDown);
+  }, [windowsDown]);
+
+  useEffect(() => {
+    if (!modelRef.current) return;
+
+    setEmbeddedLightVisibility(modelRef.current, lightsOn);
+    applySimulatedHeadlights(modelRef.current, lightsOn);
+
+    if (lightsOn) {
+      focusCameraOnLights(modelRef.current, cameraRef.current, controlsRef.current);
+    }
+  }, [lightsOn]);
 
   const resolvedPath = modelPath ?? model.modelPath ?? pathMap[model.id] ?? "";
 
   return (
     <div className="relative h-full min-h-[420px] w-full overflow-hidden rounded-lg bg-[#050915]">
-      <div ref={hostRef} className="h-full w-full" />
+      <div
+        ref={hostRef}
+        className="h-full w-full cursor-grab active:cursor-grabbing"
+        tabIndex={0}
+        aria-label="3D vehicle viewport. Drag left or right to rotate, use arrow keys to orbit, use plus or minus to zoom, and use W A S D to move the vehicle and stage."
+      />
 
       {!resolvedPath && (
         <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-slate-300">
@@ -436,10 +594,97 @@ export default function CustomizationViewer({
       )}
 
       <div className="pointer-events-none absolute bottom-4 left-4 rounded-md border border-white/15 bg-black/60 px-4 py-2 text-sm text-white shadow-lg backdrop-blur">
-        3D viewport — change colors using the panel
+        3D viewport — arrows orbit, +/- zoom, W/A/S/D move the vehicle and stage
       </div>
     </div>
   );
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+
+  const tagName = target.tagName.toLowerCase();
+  return (
+    tagName === "input" ||
+    tagName === "textarea" ||
+    tagName === "select" ||
+    target.isContentEditable
+  );
+}
+
+function translateModelWithKeyboard(
+  camera: THREE.PerspectiveCamera,
+  model: THREE.Group | null,
+  stage: THREE.Group | null,
+  deltaScreenX: number,
+  deltaScreenY: number,
+) {
+  if (!model) return;
+
+  /**
+   * Translate in screen space instead of fixed world x/y. This keeps A/D moving
+   * visually left/right after the camera has orbited to a side view, instead of
+   * accidentally pushing the car forward/backward in depth.
+   */
+  const screenRight = new THREE.Vector3();
+  const screenUp = new THREE.Vector3();
+  camera.updateMatrixWorld(true);
+  camera.matrixWorld.extractBasis(screenRight, screenUp, new THREE.Vector3());
+
+  const movement = screenRight
+    .multiplyScalar(deltaScreenX)
+    .add(screenUp.multiplyScalar(deltaScreenY));
+
+  model.position.add(movement);
+  model.updateMatrixWorld(true);
+
+  if (stage) {
+    stage.position.add(movement);
+    stage.updateMatrixWorld(true);
+  }
+}
+
+function orbitCameraWithKeyboard(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls,
+  azimuthDelta: number,
+  polarDelta: number,
+) {
+  const target = controls.target.clone();
+  const offset = camera.position.clone().sub(target);
+  const spherical = new THREE.Spherical().setFromVector3(offset);
+
+  spherical.theta += azimuthDelta;
+  spherical.phi = THREE.MathUtils.clamp(
+    spherical.phi + polarDelta,
+    0.18,
+    Math.PI - 0.18,
+  );
+
+  offset.setFromSpherical(spherical);
+  camera.position.copy(target).add(offset);
+  camera.lookAt(target);
+  controls.update();
+}
+
+function zoomCameraWithKeyboard(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls,
+  factor: number,
+) {
+  const target = controls.target.clone();
+  const offset = camera.position.clone().sub(target);
+  const currentDistance = offset.length();
+  const nextDistance = THREE.MathUtils.clamp(
+    currentDistance * factor,
+    controls.minDistance || 0.1,
+    controls.maxDistance || currentDistance * 8,
+  );
+
+  offset.setLength(nextDistance);
+  camera.position.copy(target).add(offset);
+  camera.lookAt(target);
+  controls.update();
 }
 
 function fitCameraToObject(
@@ -449,7 +694,7 @@ function fitCameraToObject(
 ) {
   object.updateMatrixWorld(true);
 
-  const box = new THREE.Box3().setFromObject(object);
+  const box = getCleanWorldBox(object);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
 
@@ -460,30 +705,41 @@ function fitCameraToObject(
     2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
 
   /**
-   * 让车真正撑满大 canvas：
-   * 去掉原来的 size.z 深度补偿，否则相机会离车太远。
+   * Initial load must show a normal full-car view. Use the largest horizontal
+   * axis instead of assuming x is width; several GLBs are length-aligned on z,
+   * and fitting only x can place the camera inside the cabin/body.
    */
   const fitHeightDistance =
     size.y / (2 * Math.tan(verticalFov / 2) * CAMERA_FILL_RATIO);
 
   const fitWidthDistance =
-    size.x / (2 * Math.tan(horizontalFov / 2) * CAMERA_FILL_RATIO);
+    Math.max(size.x, size.z) /
+    (2 * Math.tan(horizontalFov / 2) * CAMERA_FILL_RATIO);
 
   const distance =
-    Math.max(fitHeightDistance, fitWidthDistance) * CAMERA_PADDING;
+    Math.max(fitHeightDistance, fitWidthDistance) * CAMERA_PADDING * 1.18;
 
+  const metrics = getCarMetrics(object as THREE.Group);
   const target = new THREE.Vector3(
     center.x,
-    center.y + size.y * 0.02,
+    center.y + size.y * 0.08,
     center.z,
   );
 
-  camera.position.set(
-    center.x,
-    center.y + size.y * 0.12,
-    center.z + distance,
+  const cameraPosition = target.clone();
+  setAxisValue(
+    cameraPosition,
+    metrics.lengthAxis,
+    getAxisValue(center, metrics.lengthAxis) + distance * 0.72,
   );
+  setAxisValue(
+    cameraPosition,
+    metrics.widthAxis,
+    getAxisValue(center, metrics.widthAxis) + distance * 0.46,
+  );
+  cameraPosition.y = center.y + size.y * 0.5;
 
+  camera.position.copy(cameraPosition);
   camera.lookAt(target);
 
   camera.near = Math.max(distance / 100, 0.01);
@@ -987,6 +1243,649 @@ function applyColorsToScene(
       }
     });
   });
+}
+
+
+type CarMetrics = {
+  box: THREE.Box3;
+  size: THREE.Vector3;
+  center: THREE.Vector3;
+  lengthAxis: "x" | "z";
+  widthAxis: "x" | "z";
+  lengthMin: number;
+  lengthMax: number;
+  widthMin: number;
+  widthMax: number;
+};
+
+type WheelAnchor = {
+  box: THREE.Box3;
+  center: THREE.Vector3;
+  radius: number;
+};
+
+function getCarMetrics(group: THREE.Group): CarMetrics {
+  group.updateMatrixWorld(true);
+
+  const box = getCleanWorldBox(group);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const lengthAxis: "x" | "z" = size.x >= size.z ? "x" : "z";
+  const widthAxis: "x" | "z" = lengthAxis === "x" ? "z" : "x";
+
+  return {
+    box,
+    size,
+    center,
+    lengthAxis,
+    widthAxis,
+    lengthMin: getAxisValue(box.min, lengthAxis),
+    lengthMax: getAxisValue(box.max, lengthAxis),
+    widthMin: getAxisValue(box.min, widthAxis),
+    widthMax: getAxisValue(box.max, widthAxis),
+  };
+}
+
+function getCleanWorldBox(root: THREE.Object3D) {
+  const box = new THREE.Box3();
+
+  root.updateMatrixWorld(true);
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    if (isCustomizationHelper(obj)) return;
+
+    obj.updateWorldMatrix(true, false);
+    const meshBox = new THREE.Box3().setFromObject(obj);
+    if (!meshBox.isEmpty()) {
+      box.union(meshBox);
+    }
+  });
+
+  if (box.isEmpty()) {
+    return new THREE.Box3().setFromObject(root);
+  }
+
+  return box;
+}
+
+function isCustomizationHelper(obj: THREE.Object3D) {
+  return obj.name.startsWith("__custom_") || Boolean(obj.userData?.__customizationHelper);
+}
+
+function moveCameraTo(
+  camera: THREE.PerspectiveCamera | null,
+  controls: OrbitControls | null,
+  position: THREE.Vector3,
+  target: THREE.Vector3,
+  minDistance = 0.8,
+  maxDistance?: number,
+) {
+  if (!camera) return;
+
+  camera.position.copy(position);
+  camera.lookAt(target);
+  camera.near = 0.01;
+  camera.far = Math.max(position.distanceTo(target) * 12, 100);
+  camera.updateProjectionMatrix();
+
+  if (controls) {
+    controls.target.copy(target);
+    const currentDistance = position.distanceTo(target);
+    controls.minDistance = minDistance;
+    controls.maxDistance = Math.max(maxDistance ?? currentDistance * 3, currentDistance * 3, 6);
+    controls.update();
+  }
+}
+
+function focusCameraOnWheels(
+  group: THREE.Group,
+  camera: THREE.PerspectiveCamera | null,
+  controls: OrbitControls | null,
+) {
+  const anchors = findWheelAnchors(group);
+  const metrics = getCarMetrics(group);
+  const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
+  const width = Math.abs(metrics.widthMax - metrics.widthMin);
+  const anchor = anchors[0];
+  const target = anchor?.center.clone() ?? new THREE.Vector3(metrics.center.x, metrics.box.min.y + metrics.size.y * 0.24, metrics.center.z);
+  const radius = anchor?.radius ?? Math.max(metrics.size.y * 0.16, 0.55);
+
+  if (!anchor) {
+    setAxisValue(target, metrics.lengthAxis, metrics.lengthMin + length * 0.72);
+    setAxisValue(target, metrics.widthAxis, metrics.widthMax);
+  }
+
+  /**
+   * Aim at the wheel center and keep enough distance to frame the full tire.
+   * This keeps the selected wheel in the middle of the viewport instead of
+   * cropped against the bottom edge.
+   */
+  target.y += radius * 0.04;
+
+  const sideDirection = getAxisValue(target, metrics.widthAxis) >=
+    (metrics.widthMin + metrics.widthMax) / 2
+    ? 1
+    : -1;
+  const distance = Math.max(radius * 3.4, width * 0.48, metrics.size.y * 0.7);
+  const position = target.clone();
+  setAxisValue(position, metrics.lengthAxis, getAxisValue(target, metrics.lengthAxis) + length * 0.08);
+  setAxisValue(position, metrics.widthAxis, getAxisValue(target, metrics.widthAxis) + sideDirection * distance);
+  position.y = target.y + radius * 0.18;
+
+  /**
+   * After focusing a wheel, users still need to zoom back out to inspect the
+   * whole car. Keep the close wheel framing, but set a full-car max zoom range
+   * instead of capping OrbitControls around the close-up distance.
+   */
+  const wholeCarZoomDistance = Math.max(length * 2.4, width * 4.2, metrics.size.y * 7.5, distance * 8);
+
+  moveCameraTo(
+    camera,
+    controls,
+    position,
+    target,
+    Math.max(radius * 0.35, 0.18),
+    wholeCarZoomDistance,
+  );
+}
+
+function focusCameraOnInterior(
+  group: THREE.Group,
+  camera: THREE.PerspectiveCamera | null,
+  controls: OrbitControls | null,
+) {
+  const metrics = getCarMetrics(group);
+  const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
+  const width = Math.abs(metrics.widthMax - metrics.widthMin);
+  const target = new THREE.Vector3(
+    metrics.center.x,
+    metrics.box.min.y + metrics.size.y * 0.58,
+    metrics.center.z,
+  );
+  setAxisValue(target, metrics.lengthAxis, metrics.lengthMin + length * 0.5);
+
+  /**
+   * Use an elevated front-quarter cabin view instead of placing the camera deep
+   * inside the dark dashboard. This frames seats/console through the windshield
+   * or open cabin while avoiding a nearly black close-up surface.
+   */
+  const position = target.clone();
+  setAxisValue(position, metrics.lengthAxis, metrics.lengthMin + length * 0.18);
+  setAxisValue(position, metrics.widthAxis, metrics.widthMax + width * 0.28);
+  position.y = metrics.box.min.y + metrics.size.y * 0.86;
+
+  applyInteriorPreviewLight(group, target);
+  moveCameraTo(camera, controls, position, target, 0.45, Math.max(length * 2.2, width * 4.2, 8));
+}
+
+function applyInteriorPreviewLight(group: THREE.Group, worldTarget: THREE.Vector3) {
+  removeCustomChildren(group, "__custom_interior_preview_light");
+
+  const metrics = getCarMetrics(group);
+  const scale = getUniformWorldScale(group);
+  const lightDistance = Math.max(metrics.size.x, metrics.size.y, metrics.size.z) * 0.75;
+  const localTarget = group.worldToLocal(worldTarget.clone());
+
+  const cabinPoint = new THREE.PointLight("#f5fbff", 95, lightDistance, 1.05);
+  cabinPoint.name = "__custom_interior_preview_light";
+  cabinPoint.userData.__customizationHelper = true;
+  cabinPoint.position.copy(localTarget);
+  cabinPoint.position.y += (metrics.size.y * 0.12) / scale;
+  group.add(cabinPoint);
+
+  const softFill = new THREE.SpotLight("#d9ecff", 70, lightDistance * 1.4, Math.PI / 3.2, 0.72, 1.1);
+  softFill.name = "__custom_interior_preview_light";
+  softFill.userData.__customizationHelper = true;
+  softFill.position.copy(localTarget);
+  softFill.position.y += (metrics.size.y * 0.55) / scale;
+  const target = new THREE.Object3D();
+  target.name = "__custom_interior_preview_light";
+  target.userData.__customizationHelper = true;
+  target.position.copy(localTarget);
+  group.add(softFill, target);
+  softFill.target = target;
+}
+
+function focusCameraOnDoors(
+  group: THREE.Group,
+  camera: THREE.PerspectiveCamera | null,
+  controls: OrbitControls | null,
+) {
+  const metrics = getCarMetrics(group);
+  const width = Math.abs(metrics.widthMax - metrics.widthMin);
+  const target = new THREE.Vector3(metrics.center.x, metrics.box.min.y + metrics.size.y * 0.48, metrics.center.z);
+  setAxisValue(target, metrics.widthAxis, metrics.widthMax);
+
+  const position = target.clone();
+  setAxisValue(position, metrics.widthAxis, metrics.widthMax + width * 0.92);
+  position.y += metrics.size.y * 0.12;
+
+  moveCameraTo(camera, controls, position, target, 0.5);
+}
+
+function focusCameraOnLights(
+  group: THREE.Group,
+  camera: THREE.PerspectiveCamera | null,
+  controls: OrbitControls | null,
+) {
+  const metrics = getCarMetrics(group);
+  const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
+  const target = new THREE.Vector3(metrics.center.x, metrics.box.min.y + metrics.size.y * 0.44, metrics.center.z);
+  const front = FRONT_SIGN === 1 ? metrics.lengthMax : metrics.lengthMin;
+  setAxisValue(target, metrics.lengthAxis, front);
+
+  const position = target.clone();
+  setAxisValue(
+    position,
+    metrics.lengthAxis,
+    front + (FRONT_SIGN === 1 ? length * 0.62 : -length * 0.62),
+  );
+  position.y += metrics.size.y * 0.08;
+
+  moveCameraTo(camera, controls, position, target, 0.45);
+}
+
+function applyWheelCustomization(
+  group: THREE.Group,
+  color = "#cfd6df",
+  style: WheelStyle = "classic",
+) {
+  group.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+
+    const name = getObjectSearchName(obj);
+    if (!isWheelLikeName(name)) return;
+
+    if (isDecorativeWheelBlurName(name)) {
+      obj.visible = false;
+      return;
+    }
+
+    obj.visible = true;
+
+    getMaterials(obj).forEach((material) => {
+      const mat = material as any;
+      if (!mat.color) return;
+
+      if (name.includes("tyre") || name.includes("tire")) {
+        mat.color.set("#050609");
+        mat.roughness = Math.max(mat.roughness ?? 0.7, 0.7);
+      } else {
+        mat.color.set(color);
+        mat.metalness = style === "sport" ? 0.95 : 0.82;
+        mat.roughness = style === "aero" ? 0.18 : 0.32;
+      }
+
+      mat.needsUpdate = true;
+    });
+  });
+
+  /**
+   * Do not add replacement wheel geometry here. The source model keeps its
+   * original wheels; wheel controls only recolor/restyle existing wheel
+   * materials and then move the camera close to the actual wheel.
+   */
+  removeCustomChildren(group, "__custom_wheel_proxy");
+  removeLegacyWheelHelpers(group);
+}
+
+function findWheelAnchors(group: THREE.Group): WheelAnchor[] {
+  const metrics = getCarMetrics(group);
+  const maxModelAxis = Math.max(metrics.size.x, metrics.size.y, metrics.size.z, 1);
+  const wheelBoxes = new Map<string, THREE.Box3>();
+
+  group.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    if (isCustomizationHelper(obj)) return;
+
+    const name = getObjectSearchName(obj);
+    if (!isWheelLikeName(name) || isDecorativeWheelBlurName(name)) return;
+
+    obj.updateWorldMatrix(true, false);
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const minDim = Math.min(size.x, size.y, size.z);
+
+    if (!Number.isFinite(maxDim) || maxDim <= 0 || maxDim > maxModelAxis * 0.45 || minDim <= 0) {
+      return;
+    }
+
+    const center = box.getCenter(new THREE.Vector3());
+    const side = getAxisValue(center, metrics.widthAxis) >=
+      (metrics.widthMin + metrics.widthMax) / 2
+      ? "right"
+      : "left";
+    const axle = getAxisValue(center, metrics.lengthAxis) >=
+      (metrics.lengthMin + metrics.lengthMax) / 2
+      ? "front"
+      : "rear";
+    const key = `${side}-${axle}`;
+    const existing = wheelBoxes.get(key);
+
+    if (existing) {
+      existing.union(box);
+    } else {
+      wheelBoxes.set(key, box.clone());
+    }
+  });
+
+  const anchors = Array.from(wheelBoxes.values()).map((box) => {
+    const size = box.getSize(new THREE.Vector3());
+    return {
+      box,
+      center: box.getCenter(new THREE.Vector3()),
+      radius: Math.max(size.x, size.y, size.z) * 0.5,
+    };
+  });
+
+  anchors.sort((a, b) => {
+    const aSide = getAxisValue(a.center, metrics.widthAxis);
+    const bSide = getAxisValue(b.center, metrics.widthAxis);
+    const sideSort = bSide - aSide;
+    if (Math.abs(sideSort) > 0.01) return sideSort;
+    return getAxisValue(b.center, metrics.lengthAxis) - getAxisValue(a.center, metrics.lengthAxis);
+  });
+
+  return anchors.slice(0, 4);
+}
+
+function applyDoorState(group: THREE.Group, open: boolean) {
+  /**
+   * Do not create fake/proxy doors. Only move real door nodes that exist in the
+   * loaded GLB. Models without separate door objects will remain unchanged.
+   */
+  removeCustomChildren(group, "__custom_door_proxy");
+  const metrics = getCarMetrics(group);
+
+  group.traverse((obj) => {
+    if (isCustomizationHelper(obj)) return;
+
+    const name = (obj.name || "").toLowerCase();
+    if (!name.includes("door")) return;
+
+    restoreOriginalDoorTransform(obj);
+
+    if (!open) return;
+
+    rotateRealDoorAroundComputedHinge(obj, metrics);
+  });
+}
+
+function restoreOriginalDoorTransform(obj: THREE.Object3D) {
+  if (!obj.userData.__customOriginalPosition) {
+    obj.userData.__customOriginalPosition = obj.position.clone();
+    obj.userData.__customOriginalQuaternion = obj.quaternion.clone();
+    obj.userData.__customOriginalScale = obj.scale.clone();
+  }
+
+  obj.position.copy(obj.userData.__customOriginalPosition as THREE.Vector3);
+  obj.quaternion.copy(obj.userData.__customOriginalQuaternion as THREE.Quaternion);
+  obj.scale.copy(obj.userData.__customOriginalScale as THREE.Vector3);
+  obj.updateMatrixWorld(true);
+}
+
+function rotateRealDoorAroundComputedHinge(
+  obj: THREE.Object3D,
+  metrics: CarMetrics,
+) {
+  obj.updateWorldMatrix(true, true);
+
+  const parent = obj.parent;
+  if (!parent) return;
+
+  const doorBox = new THREE.Box3().setFromObject(obj);
+  if (doorBox.isEmpty()) return;
+
+  const doorCenter = doorBox.getCenter(new THREE.Vector3());
+  const sideCenter = (metrics.widthMin + metrics.widthMax) / 2;
+  const sideSign = getAxisValue(doorCenter, metrics.widthAxis) >= sideCenter ? 1 : -1;
+  const hingeLength = FRONT_SIGN === 1
+    ? getAxisValue(doorBox.max, metrics.lengthAxis)
+    : getAxisValue(doorBox.min, metrics.lengthAxis);
+  const hingePoint = doorCenter.clone();
+  setAxisValue(hingePoint, metrics.lengthAxis, hingeLength);
+
+  const openAngle = sideSign > 0 ? -0.95 : 0.95;
+  const parentWorldInverse = parent.matrixWorld.clone().invert();
+  const originalWorld = obj.matrixWorld.clone();
+  const hingeRotation = new THREE.Matrix4()
+    .makeTranslation(hingePoint.x, hingePoint.y, hingePoint.z)
+    .multiply(new THREE.Matrix4().makeRotationY(openAngle))
+    .multiply(new THREE.Matrix4().makeTranslation(-hingePoint.x, -hingePoint.y, -hingePoint.z));
+  const newWorld = hingeRotation.multiply(originalWorld);
+  const newLocal = parentWorldInverse.multiply(newWorld);
+
+  newLocal.decompose(obj.position, obj.quaternion, obj.scale);
+  obj.updateMatrixWorld(true);
+}
+
+function applyWindowState(group: THREE.Group, down: boolean) {
+  group.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+
+    const name = getObjectSearchName(obj);
+    const isGlass =
+      name.includes("window") ||
+      name.includes("glass") ||
+      name.includes("windshield") ||
+      name.includes("windscreen");
+
+    if (!isGlass) return;
+
+    if (!obj.userData.__customOriginalPosition) {
+      obj.userData.__customOriginalPosition = obj.position.clone();
+    }
+
+    const originalPosition = obj.userData.__customOriginalPosition as THREE.Vector3;
+    obj.position.copy(originalPosition);
+    if (down && name.includes("window")) {
+      obj.position.y -= 0.28;
+    }
+
+    getMaterials(obj).forEach((material) => {
+      const mat = material as any;
+
+      if (mat.opacity !== undefined) {
+        if (mat.userData && mat.userData.__customOriginalOpacity === undefined) {
+          mat.userData.__customOriginalOpacity = mat.opacity;
+        }
+
+        mat.transparent = true;
+        mat.opacity = down ? 0.08 : (mat.userData?.__customOriginalOpacity ?? mat.opacity);
+        mat.depthWrite = !down;
+      }
+
+      mat.needsUpdate = true;
+    });
+  });
+}
+
+function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
+  removeCustomChildren(group, "__custom_headlight_proxy");
+  if (!on) return;
+
+  const metrics = getCarMetrics(group);
+  const scale = getUniformWorldScale(group);
+  const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
+  const width = Math.abs(metrics.widthMax - metrics.widthMin);
+  const front = FRONT_SIGN === 1 ? metrics.lengthMax : metrics.lengthMin;
+  const lightY = metrics.box.min.y + metrics.size.y * 0.43;
+  const lightWidths = [metrics.widthMin + width * 0.3, metrics.widthMax - width * 0.3];
+  const direction = FRONT_SIGN === 1 ? 1 : -1;
+
+  lightWidths.forEach((widthPos) => {
+    const worldBulb = new THREE.Vector3(metrics.center.x, lightY, metrics.center.z);
+    setAxisValue(worldBulb, metrics.lengthAxis, front + direction * length * 0.012);
+    setAxisValue(worldBulb, metrics.widthAxis, widthPos);
+
+    const bulbRadius = Math.max(width * 0.055, metrics.size.y * 0.035) / scale;
+    const bulb = new THREE.Mesh(
+      new THREE.SphereGeometry(bulbRadius, 32, 16),
+      new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 1, toneMapped: false }),
+    );
+    bulb.name = "__custom_headlight_proxy";
+    bulb.userData.__customizationHelper = true;
+    bulb.position.copy(group.worldToLocal(worldBulb.clone()));
+    group.add(bulb);
+
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(bulbRadius * 2.8, 32, 16),
+      new THREE.MeshBasicMaterial({
+        color: "#9ed8ff",
+        transparent: true,
+        opacity: 0.32,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    glow.name = "__custom_headlight_proxy";
+    glow.userData.__customizationHelper = true;
+    glow.position.copy(bulb.position);
+    group.add(glow);
+
+    const beamLength = (length * 0.52) / scale;
+    const beam = new THREE.Mesh(
+      new THREE.ConeGeometry(Math.max(width * 0.16, 0.18) / scale, beamLength, 36, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: "#8fd3ff",
+        transparent: true,
+        opacity: 0.18,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      }),
+    );
+    beam.name = "__custom_headlight_proxy";
+    beam.userData.__customizationHelper = true;
+    beam.position.copy(group.worldToLocal(worldBulb.clone()));
+    setAxisValue(beam.position, metrics.lengthAxis, getAxisValue(beam.position, metrics.lengthAxis) + direction * beamLength * 0.5);
+    beam.rotation.x = metrics.lengthAxis === "z" ? Math.PI / 2 : 0;
+    beam.rotation.z = metrics.lengthAxis === "x" ? -direction * Math.PI / 2 : 0;
+    group.add(beam);
+
+    const spot = new THREE.SpotLight("#dff4ff", 55, length * 2.2, Math.PI / 7, 0.45, 0.9);
+    spot.name = "__custom_headlight_proxy";
+    spot.userData.__customizationHelper = true;
+    spot.position.copy(bulb.position);
+    const target = new THREE.Object3D();
+    target.name = "__custom_headlight_proxy";
+    target.userData.__customizationHelper = true;
+    const worldTarget = worldBulb.clone();
+    setAxisValue(worldTarget, metrics.lengthAxis, front + direction * length * 0.9);
+    target.position.copy(group.worldToLocal(worldTarget));
+    group.add(spot, target);
+    spot.target = target;
+  });
+}
+
+function setEmbeddedLightVisibility(group: THREE.Group, visible: boolean) {
+  group.traverse((obj) => {
+    if (obj.userData?.__embeddedLightOverlay) {
+      obj.visible = visible;
+    }
+
+    if (obj instanceof THREE.Mesh && meshUsesRealLightMaterial(obj)) {
+      getMaterials(obj).forEach((material) => {
+        const mat = material as any;
+        if (mat.emissiveIntensity !== undefined) {
+          mat.emissiveIntensity = visible ? 4.5 : 0.05;
+        }
+        if (mat.emissive && visible) {
+          mat.emissive.set("#ffffff");
+        }
+        mat.needsUpdate = true;
+      });
+    }
+  });
+}
+
+function removeCustomChildren(parent: THREE.Object3D, name: string) {
+  const toRemove: THREE.Object3D[] = [];
+
+  parent.traverse((obj) => {
+    obj.children.forEach((child) => {
+      if (child.name === name || child.name.startsWith(`${name}_`)) {
+        toRemove.push(child);
+      }
+    });
+  });
+
+  toRemove.forEach((child) => {
+    child.parent?.remove(child);
+    disposeObject3D(child);
+  });
+}
+
+function removeLegacyWheelHelpers(parent: THREE.Object3D) {
+  const toRemove: THREE.Object3D[] = [];
+
+  parent.traverse((obj) => {
+    obj.children.forEach((child) => {
+      const name = (child.name || "").toLowerCase();
+      if (name.includes("custom") && name.includes("wheel")) {
+        toRemove.push(child);
+      }
+    });
+  });
+
+  toRemove.forEach((child) => {
+    child.parent?.remove(child);
+    disposeObject3D(child);
+  });
+}
+
+function getObjectSearchName(obj: THREE.Mesh) {
+  return `${obj.name || ""} ${getMaterialNames(obj)}`.toLowerCase();
+}
+
+function isWheelLikeName(name: string) {
+  return (
+    name.includes("wheel") ||
+    name.includes("rim") ||
+    name.includes("rims") ||
+    name.includes("alloy") ||
+    name.includes("tyre") ||
+    name.includes("tire") ||
+    name.includes("tnrrims")
+  );
+}
+
+function isDecorativeWheelBlurName(name: string) {
+  return (
+    name.includes("tireblur") ||
+    name.includes("tyreblur") ||
+    name.includes("tire_blur") ||
+    name.includes("tyre_blur") ||
+    name.includes("wheelblur") ||
+    name.includes("wheel_blur") ||
+    name.includes("wheel1a_alpha")
+  );
+}
+
+function getUniformWorldScale(object: THREE.Object3D) {
+  const scale = object.getWorldScale(new THREE.Vector3());
+  return Math.max(scale.x, scale.y, scale.z, 0.0001);
+}
+
+function getMaterials(mesh: THREE.Mesh) {
+  return Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+}
+
+function getMaterialNames(mesh: THREE.Mesh) {
+  return getMaterials(mesh)
+    .map((material) => (material as any)?.name || "")
+    .join(" ");
+}
+
+function setAxisValue(vector: THREE.Vector3, axis: "x" | "z", value: number) {
+  if (axis === "x") {
+    vector.x = value;
+  } else {
+    vector.z = value;
+  }
 }
 
 function disposeObject3D(object: THREE.Object3D) {

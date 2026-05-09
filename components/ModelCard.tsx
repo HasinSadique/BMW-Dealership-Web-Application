@@ -33,7 +33,7 @@ const stageCars: StageCar[] = [
     name: "BMW Z8 Roadster",
     series: "Heritage Roadster",
     modelPath: "/models/bmw_z8__www.vecarz.com.glb",
-    customizationSlug: "bmw-5-series",
+    customizationSlug: "bmw-z8",
     stageSize: 6.15,
     groundOffset: 0.05,
     initialYaw: Math.PI / 2 - 0.12,
@@ -49,7 +49,7 @@ const stageCars: StageCar[] = [
     name: "BMW M3 CS Touring",
     series: "Track Wagon",
     modelPath: "/models/2025_bmw_m3_cs_touring.glb",
-    customizationSlug: "bmw-x5",
+    customizationSlug: "bmw-m3-cs-touring",
     stageSize: 6.1,
     groundOffset: 0.05,
     initialYaw: Math.PI / 2 - 0.12,
@@ -65,7 +65,7 @@ const stageCars: StageCar[] = [
     name: "BMW M4 F82",
     series: "M Coupe",
     modelPath: "/models/bmw_m4_f82.glb",
-    customizationSlug: "bmw-i4",
+    customizationSlug: "bmw-m4-f82",
     stageSize: 5.9,
     groundOffset: 0.07,
     initialYaw: Math.PI / 2 - 0.12,
@@ -113,7 +113,7 @@ const stageCars: StageCar[] = [
     name: "BMW M3 Topaz Blue",
     series: "Performance Sedan",
     modelPath: "/models/bmw_m3_sedan_topaz_blue_car.glb",
-    customizationSlug: "bmw-5-series",
+    customizationSlug: "bmw-m3-topaz",
     stageSize: 6.15,
     groundOffset: 0.08,
     initialYaw: 0.08,
@@ -166,6 +166,10 @@ export default function ModelCard({ models }: ModelCardProps) {
     const fallbackSlug = models[0]?.id ?? "bmw-5-series";
     return `/customization/${activeCar.customizationSlug || fallbackSlug}`;
   }, [activeCar.customizationSlug, models]);
+
+  const shiftModel = (direction: -1 | 1) => {
+    setActiveIndex((current) => (current + direction + stageCars.length) % stageCars.length);
+  };
 
   useEffect(() => {
     const host = canvasHostRef.current;
@@ -378,9 +382,6 @@ export default function ModelCard({ models }: ModelCardProps) {
     let cancelled = false;
     const loader = new GLTFLoader();
     setLoadState(`Loading ${activeCar.name}`);
-    // debug: log the model path we're about to load
-    // (helps verify public/models filenames and network requests)
-    // eslint-disable-next-line no-console
     console.log("[ModelCard] loading model:", activeCar.modelPath);
 
     while (group.children.length > 0) {
@@ -444,12 +445,11 @@ export default function ModelCard({ models }: ModelCardProps) {
             const pct = Math.round((xhr.loaded / xhr.total) * 100);
             setLoadState(`Loading ${activeCar.name} — ${pct}%`);
           }
-        } catch (e) {
-          /* ignore */
+        } catch {
+          // Ignore progress events with incomplete browser data.
         }
       },
       (error) => {
-        // eslint-disable-next-line no-console
         console.error("[ModelCard] GLTF load error:", activeCar.modelPath, error);
         if (!cancelled) setLoadState(`Failed to load ${activeCar.name}`);
       },
@@ -462,10 +462,6 @@ export default function ModelCard({ models }: ModelCardProps) {
 
   const selectModel = (index: number) => {
     setActiveIndex(index);
-  };
-
-  const shiftModel = (direction: -1 | 1) => {
-    setActiveIndex((current) => (current + direction + stageCars.length) % stageCars.length);
   };
 
   return (

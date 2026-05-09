@@ -59,6 +59,18 @@
     "description": "A carbon-focused performance wagon with all-wheel drive traction and daily usable pace."
   },
   {
+    "id": "bmw-m4-f82",
+    "name": "BMW M4 F82",
+    "series": "M Coupe",
+    "price": 164800,
+    "year": 2025,
+    "range": "Petrol",
+    "horsepower": 503,
+    "heroImage": "/images/bmw-showroom-reference.png",
+    "modelPath": "/models/bmw_m4_f82.glb",
+    "description": "A compact M coupe built around aggressive aero, rear-biased balance, and fast exits."
+  },
+  {
     "id": "bmw-m4-competition",
     "name": "BMW M4 Competition",
     "series": "M Coupe",
@@ -69,5 +81,29 @@
     "heroImage": "/images/bmw-showroom-reference.png",
     "modelPath": "/models/2025_bmw_m4_competition.glb",
     "description": "Aggressive competition-spec coupe tuned for high-speed stability and sharp handling."
+  },
+  {
+    "id": "bmw-z8",
+    "name": "BMW Z8 Roadster",
+    "series": "Heritage Roadster",
+    "price": 248900,
+    "year": 2025,
+    "range": "Petrol",
+    "horsepower": 395,
+    "heroImage": "/images/bmw-showroom-reference.png",
+    "modelPath": "/models/bmw_z8__www.vecarz.com.glb",
+    "description": "A low-slung collector roadster tuned for sharp response and cinematic presence."
+  },
+  {
+    "id": "bmw-m3-topaz",
+    "name": "BMW M3 Topaz Blue",
+    "series": "Performance Sedan",
+    "price": 151200,
+    "year": 2025,
+    "range": "Petrol",
+    "horsepower": 473,
+    "heroImage": "/images/bmw-showroom-reference.png",
+    "modelPath": "/models/bmw_m3_sedan_topaz_blue_car.glb",
+    "description": "A vivid sports sedan with a planted stance, precise steering, and an elevated street tune."
   }
 ]
