@@ -154,7 +154,7 @@ export default function CustomizationViewer({
     renderer.setClearColor(SCENE_BACKGROUND, 1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.22;
+    renderer.toneMappingExposure = 0.82;
 
     if ("physicallyCorrectLights" in renderer) {
       (renderer as any).physicallyCorrectLights = true;
@@ -180,23 +180,23 @@ export default function CustomizationViewer({
 
     controlsRef.current = controls;
 
-    const hemi = new THREE.HemisphereLight("#eef6ff", "#101a2c", 2.15);
+    const hemi = new THREE.HemisphereLight("#dce8f8", "#101a2c", 1.28);
     scene.add(hemi);
 
-    const ambientFill = new THREE.AmbientLight("#dcecff", 0.72);
+    const ambientFill = new THREE.AmbientLight("#c8d8ec", 0.34);
     scene.add(ambientFill);
 
-    const overheadFill = new THREE.DirectionalLight("#ffffff", 3.35);
+    const overheadFill = new THREE.DirectionalLight("#f2f7ff", 1.15);
     overheadFill.position.set(0, 10.5, 2.2);
     scene.add(overheadFill);
 
-    const frontPanelFill = new THREE.DirectionalLight("#d7ecff", 1.65);
+    const frontPanelFill = new THREE.DirectionalLight("#d7ecff", 0.78);
     frontPanelFill.position.set(0, 4.4, 8.8);
     scene.add(frontPanelFill);
 
     const topDownSpot = new THREE.SpotLight(
       "#ffffff",
-      640,
+      145,
       22,
       Math.PI / 4.4,
       0.5,
@@ -207,7 +207,7 @@ export default function CustomizationViewer({
 
     const keyLight = new THREE.SpotLight(
       "#b9d8ff",
-      560,
+      170,
       30,
       Math.PI / 5,
       0.35,
@@ -218,7 +218,7 @@ export default function CustomizationViewer({
 
     const rimLight = new THREE.SpotLight(
       "#ffffff",
-      320,
+      115,
       24,
       Math.PI / 6,
       0.4,
@@ -1195,21 +1195,8 @@ function applyColorsToScene(
 
       if (isGlass || isWheel) return;
 
-      const isInterior =
-        name.includes("interior") ||
-        name.includes("seat") ||
-        name.includes("leather") ||
-        name.includes("dashboard") ||
-        name.includes("steering");
-
-      const isExterior =
-        name.includes("paint") ||
-        name.includes("body") ||
-        name.includes("carpaint") ||
-        name.includes("car_paint") ||
-        name.includes("exterior") ||
-        name.includes("bodywork") ||
-        mat.metalness > 0.2;
+      const isInterior = isInteriorMaterialName(name);
+      const isExterior = isExteriorMaterialName(name);
 
       if (interior && isInterior) {
         try {
@@ -1233,16 +1220,37 @@ function applyColorsToScene(
         return;
       }
 
-      if (exterior && mat.roughness !== undefined && mat.roughness < 0.8) {
-        try {
-          mat.color.set(exterior);
-          mat.needsUpdate = true;
-        } catch {
-          // ignore invalid color values
-        }
-      }
     });
   });
+}
+
+function isInteriorMaterialName(name: string) {
+  return (
+    name.includes("interior") ||
+    name.includes("inter_") ||
+    name.includes("seat") ||
+    name.includes("sieges") ||
+    name.includes("leather") ||
+    name.includes("dashboard") ||
+    name.includes("steering") ||
+    name.includes("cockpit") ||
+    name.includes("carpet")
+  );
+}
+
+function isExteriorMaterialName(name: string) {
+  return (
+    name.includes("arm4_main") ||
+    name.includes("arm4_rgb") ||
+    name.includes("body") ||
+    name.includes("paint") ||
+    name.includes("carpaint") ||
+    name.includes("car_paint") ||
+    name.includes("exterior") ||
+    name.includes("bodywork") ||
+    name.includes("ext_matte_colors") ||
+    name.includes("skin_base")
+  );
 }
 
 
@@ -1502,6 +1510,7 @@ function applyWheelCustomization(
     }
 
     obj.visible = true;
+    obj.material = cloneMeshMaterials(obj);
 
     getMaterials(obj).forEach((material) => {
       const mat = material as any;
@@ -1527,6 +1536,12 @@ function applyWheelCustomization(
    */
   removeCustomChildren(group, "__custom_wheel_proxy");
   removeLegacyWheelHelpers(group);
+}
+
+function cloneMeshMaterials(mesh: THREE.Mesh) {
+  return Array.isArray(mesh.material)
+    ? mesh.material.map((material) => material.clone())
+    : mesh.material.clone();
 }
 
 function findWheelAnchors(group: THREE.Group): WheelAnchor[] {
@@ -1710,16 +1725,25 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
   const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
   const width = Math.abs(metrics.widthMax - metrics.widthMin);
   const front = FRONT_SIGN === 1 ? metrics.lengthMax : metrics.lengthMin;
-  const lightY = metrics.box.min.y + metrics.size.y * 0.43;
-  const lightWidths = [metrics.widthMin + width * 0.3, metrics.widthMax - width * 0.3];
+  const lightY = metrics.box.min.y + metrics.size.y * 0.38;
+  const fallbackLightWidths = [metrics.widthMin + width * 0.28, metrics.widthMax - width * 0.28];
   const direction = FRONT_SIGN === 1 ? 1 : -1;
+  const headlightAnchors = findHeadlightAnchors(group, metrics);
+  const lightPositions = headlightAnchors.length > 0
+    ? headlightAnchors
+    : fallbackLightWidths.map((widthPos) => {
+        const worldBulb = new THREE.Vector3(metrics.center.x, lightY, metrics.center.z);
+        setAxisValue(worldBulb, metrics.lengthAxis, front - direction * length * 0.035);
+        setAxisValue(worldBulb, metrics.widthAxis, widthPos);
+        return worldBulb;
+      });
 
-  lightWidths.forEach((widthPos) => {
-    const worldBulb = new THREE.Vector3(metrics.center.x, lightY, metrics.center.z);
-    setAxisValue(worldBulb, metrics.lengthAxis, front + direction * length * 0.012);
-    setAxisValue(worldBulb, metrics.widthAxis, widthPos);
-
-    const bulbRadius = Math.max(width * 0.055, metrics.size.y * 0.035) / scale;
+  lightPositions.forEach((worldBulb) => {
+    /**
+     * Keep visible helpers tight to the real headlight lens. Large generic bulbs
+     * looked detached from the original lights on models like the Z8.
+     */
+    const bulbRadius = Math.max(width * 0.022, metrics.size.y * 0.018) / scale;
     const bulb = new THREE.Mesh(
       new THREE.SphereGeometry(bulbRadius, 32, 16),
       new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 1, toneMapped: false }),
@@ -1730,11 +1754,11 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
     group.add(bulb);
 
     const glow = new THREE.Mesh(
-      new THREE.SphereGeometry(bulbRadius * 2.8, 32, 16),
+      new THREE.SphereGeometry(bulbRadius * 2.2, 32, 16),
       new THREE.MeshBasicMaterial({
         color: "#9ed8ff",
         transparent: true,
-        opacity: 0.32,
+        opacity: 0.24,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         toneMapped: false,
@@ -1745,13 +1769,13 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
     glow.position.copy(bulb.position);
     group.add(glow);
 
-    const beamLength = (length * 0.52) / scale;
+    const beamLength = (length * 0.42) / scale;
     const beam = new THREE.Mesh(
-      new THREE.ConeGeometry(Math.max(width * 0.16, 0.18) / scale, beamLength, 36, 1, true),
+      new THREE.ConeGeometry(Math.max(width * 0.08, 0.1) / scale, beamLength, 36, 1, true),
       new THREE.MeshBasicMaterial({
         color: "#8fd3ff",
         transparent: true,
-        opacity: 0.18,
+        opacity: 0.12,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide,
@@ -1760,13 +1784,18 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
     );
     beam.name = "__custom_headlight_proxy";
     beam.userData.__customizationHelper = true;
-    beam.position.copy(group.worldToLocal(worldBulb.clone()));
-    setAxisValue(beam.position, metrics.lengthAxis, getAxisValue(beam.position, metrics.lengthAxis) + direction * beamLength * 0.5);
+    const worldBeamCenter = worldBulb.clone();
+    setAxisValue(
+      worldBeamCenter,
+      metrics.lengthAxis,
+      getAxisValue(worldBeamCenter, metrics.lengthAxis) + direction * length * 0.21,
+    );
+    beam.position.copy(group.worldToLocal(worldBeamCenter));
     beam.rotation.x = metrics.lengthAxis === "z" ? Math.PI / 2 : 0;
     beam.rotation.z = metrics.lengthAxis === "x" ? -direction * Math.PI / 2 : 0;
     group.add(beam);
 
-    const spot = new THREE.SpotLight("#dff4ff", 55, length * 2.2, Math.PI / 7, 0.45, 0.9);
+    const spot = new THREE.SpotLight("#dff4ff", 42, length * 1.8, Math.PI / 8, 0.5, 0.95);
     spot.name = "__custom_headlight_proxy";
     spot.userData.__customizationHelper = true;
     spot.position.copy(bulb.position);
@@ -1779,6 +1808,60 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
     group.add(spot, target);
     spot.target = target;
   });
+}
+
+function findHeadlightAnchors(group: THREE.Group, metrics: CarMetrics) {
+  const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
+  const front = FRONT_SIGN === 1 ? metrics.lengthMax : metrics.lengthMin;
+  const direction = FRONT_SIGN === 1 ? 1 : -1;
+  const sideBoxes = new Map<"left" | "right", THREE.Box3>();
+
+  group.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    if (isCustomizationHelper(obj)) return;
+
+    const name = getObjectSearchName(obj);
+    const isHeadlight =
+      name.includes("headlight") ||
+      name.includes("head_light") ||
+      name.includes("drl") ||
+      (name.includes("light") && !name.includes("tail") && !name.includes("rear") && !name.includes("brake"));
+
+    if (!isHeadlight || name.includes("reflector")) return;
+
+    obj.updateWorldMatrix(true, false);
+    const box = new THREE.Box3().setFromObject(obj);
+    if (box.isEmpty()) return;
+
+    const center = box.getCenter(new THREE.Vector3());
+    const lengthValue = getAxisValue(center, metrics.lengthAxis);
+    const distanceFromFront = Math.abs(front - lengthValue);
+    const relativeHeight = (center.y - metrics.box.min.y) / Math.max(metrics.size.y, 0.0001);
+
+    if (distanceFromFront > length * 0.26 || relativeHeight < 0.2 || relativeHeight > 0.72) {
+      return;
+    }
+
+    const side = getAxisValue(center, metrics.widthAxis) >= (metrics.widthMin + metrics.widthMax) / 2
+      ? "right"
+      : "left";
+    const existing = sideBoxes.get(side);
+    if (existing) {
+      existing.union(box);
+    } else {
+      sideBoxes.set(side, box.clone());
+    }
+  });
+
+  return Array.from(sideBoxes.values())
+    .map((box) => {
+      const center = box.getCenter(new THREE.Vector3());
+      // Nudge the helper slightly outward from the body skin, but keep it on the
+      // actual light cluster rather than floating in front of the bumper.
+      setAxisValue(center, metrics.lengthAxis, getAxisValue(center, metrics.lengthAxis) + direction * length * 0.006);
+      return center;
+    })
+    .sort((a, b) => getAxisValue(a, metrics.widthAxis) - getAxisValue(b, metrics.widthAxis));
 }
 
 function setEmbeddedLightVisibility(group: THREE.Group, visible: boolean) {

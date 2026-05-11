@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import type { CarModel } from "@/data/models";
@@ -10,6 +11,7 @@ type CustomizationPanelProps = {
   doorsOpen: boolean;
   windowsDown: boolean;
   lightsOn: boolean;
+  driveAwayHref: string;
   onExteriorChange?: (hex: string) => void;
   onInteriorChange?: (hex: string) => void;
   onWheelColorChange?: (hex: string) => void;
@@ -54,6 +56,7 @@ export default function CustomizationPanel({
   doorsOpen,
   windowsDown,
   lightsOn,
+  driveAwayHref,
   onExteriorChange,
   onInteriorChange,
   onWheelColorChange,
@@ -169,7 +172,15 @@ export default function CustomizationPanel({
             </div>
           </section>
 
-          <p className="text-sm text-slate-300">Customization controls for {model.name}.</p>
+          <section className="mt-6 border-t border-white/10 pt-4">
+            <Link
+              href={driveAwayHref}
+              className="block w-full rounded-xl bg-gradient-to-r from-[#2f7de1] to-[#65b7ff] px-4 py-3 text-center text-sm font-bold uppercase tracking-[0.18em] text-white shadow-[0_16px_40px_rgba(47,125,225,0.35)] transition hover:translate-y-[-1px] hover:shadow-[0_20px_48px_rgba(101,183,255,0.42)]"
+            >
+              Drive Away
+            </Link>
+          </section>
+
         </aside>
         <button
           type="button"

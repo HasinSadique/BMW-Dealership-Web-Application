@@ -12,7 +12,7 @@ type Props = {
 };
 
 export default function CustomizationApp({ model }: Props) {
-  const [exterior, setExterior] = useState<string>("#1f2937");
+  const [exterior, setExterior] = useState<string>("#F8F8F4");
   const [interior, setInterior] = useState<string>("#0b1220");
   const [wheelColor, setWheelColor] = useState<string>("#cfd6df");
   const [wheelStyle, setWheelStyle] = useState<WheelStyle>("classic");
@@ -24,6 +24,18 @@ export default function CustomizationApp({ model }: Props) {
   const focusWheelAfterSelection = () => {
     setWheelFocusKey((key) => key + 1);
   };
+
+  const driveAwayHref =
+    `/drive-away/${model.id}?` +
+    new URLSearchParams({
+      exterior,
+      interior,
+      wheel: wheelColor,
+      wheelStyle,
+      doorsOpen: String(doorsOpen),
+      windowsDown: String(windowsDown),
+      lightsOn: String(lightsOn),
+    }).toString();
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-none px-4 py-4 lg:px-8">
@@ -59,6 +71,7 @@ export default function CustomizationApp({ model }: Props) {
             doorsOpen={doorsOpen}
             windowsDown={windowsDown}
             lightsOn={lightsOn}
+            driveAwayHref={driveAwayHref}
             onExteriorChange={(c: string) => setExterior(c)}
             onInteriorChange={(c: string) => setInterior(c)}
             onWheelColorChange={(c: string) => {
