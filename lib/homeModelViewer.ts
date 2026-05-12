@@ -15,11 +15,18 @@ export type HomeModelViewerRefs = {
   modelRootRef: MutableRefObject<THREE.Object3D | null>;
   controlsRef: MutableRefObject<OrbitControls | null>;
   exitSpinRef: MutableRefObject<ExitSpin | null>;
+  /** 0 = full rotating hero, 1 = front close-up, 2 = interior through glass */
+  activeHeroRef: MutableRefObject<number>;
 };
 
 export function attachHomeModelViewer(
   mountNode: HTMLDivElement,
-  { modelRootRef, controlsRef, exitSpinRef }: HomeModelViewerRefs,
+  {
+    modelRootRef,
+    controlsRef,
+    exitSpinRef,
+    activeHeroRef,
+  }: HomeModelViewerRefs,
 ): () => void {
   let frameId: number;
   let renderer: THREE.WebGLRenderer | null = null;
@@ -177,6 +184,16 @@ export function attachHomeModelViewer(
   const group = new THREE.Group();
   scene.add(group);
   const modelCenter = new THREE.Vector3(0, 0, 0);
+
+  const hero0Position = new THREE.Vector3();
+  const hero0Target = new THREE.Vector3();
+  const hero1Position = new THREE.Vector3();
+  const hero1Target = new THREE.Vector3();
+  const hero2Position = new THREE.Vector3();
+  const hero2Target = new THREE.Vector3();
+
+  let modelReady = false;
+  let settledHero = -1;
   const floorSize = 10;
   const reflectionFloor = new Reflector(
     new THREE.PlaneGeometry(floorSize, floorSize),
@@ -219,7 +236,30 @@ export function attachHomeModelViewer(
     keyLight.shadow.camera.updateProjectionMatrix();
   }
 
-  function fitModelToViewport() {
+  function updateHero12Presets() {
+    if (!group.children.length) return;
+
+    const box = new THREE.Box3().setFromObject(group);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const mx = Math.max(size.x, size.y, size.z, 0.01);
+
+    // Front close-up (grille / headlamps toward +Z is typical after centering).
+    hero1Position
+      .copy(center)
+      .add(new THREE.Vector3(-4, mx * -0.01, mx * 0.75));
+    hero1Target.copy(center).add(new THREE.Vector3(0, mx * 0.06, mx * 0.02));
+
+    // Side quarter through glass toward cabin.
+    hero2Position
+      .copy(center)
+      .add(new THREE.Vector3(mx * 0.35, mx * 0.2, mx * 0.1));
+    hero2Target
+      .copy(center)
+      .add(new THREE.Vector3(mx * 0.1, mx * 0.11, mx * 0.02));
+  }
+
+  function fitModelToViewport(applyCamera: boolean = true) {
     if (!group.children.length) return;
 
     const fittedBox = new THREE.Box3().setFromObject(group);
@@ -235,17 +275,24 @@ export function attachHomeModelViewer(
     const cameraDistance = Math.max(fitHeight, fitWidth, fitDepth) * 0.8;
 
     modelCenter.copy(center);
-    controls.target.copy(modelCenter);
-    camera.position.set(
+    hero0Target.copy(modelCenter);
+    hero0Position.set(
       modelCenter.x + cameraDistance * 0.86,
       modelCenter.y + cameraDistance * 0.34,
       modelCenter.z + cameraDistance * 1.4,
     );
-    camera.near = Math.max(0.1, cameraDistance / 100);
-    camera.far = cameraDistance * 100;
-    camera.updateProjectionMatrix();
-    controls.update();
+
+    if (applyCamera) {
+      controls.target.copy(modelCenter);
+      camera.position.copy(hero0Position);
+      camera.near = Math.max(0.1, cameraDistance / 100);
+      camera.far = cameraDistance * 100;
+      camera.updateProjectionMatrix();
+      controls.update();
+    }
+
     fitShadowCameraToModel();
+    updateHero12Presets();
   }
 
   const loader = new GLTFLoader();
@@ -283,6 +330,8 @@ export function attachHomeModelViewer(
       );
 
       fitModelToViewport();
+      modelReady = true;
+      settledHero = 0;
     },
     undefined,
     (loadError) => {
@@ -296,14 +345,12 @@ export function attachHomeModelViewer(
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer!.setSize(w, h, false);
-    fitModelToViewport();
-  }
-
-  function onWheel(event: WheelEvent) {
-    event.preventDefault();
-    stopAutoRotateOnInteraction();
-    controls.rotateLeft(event.deltaY * 0.0022);
-    controls.update();
+    const applyCamera =
+      !modelReady || THREE.MathUtils.clamp(activeHeroRef.current, 0, 2) === 0;
+    fitModelToViewport(applyCamera);
+    if (modelReady && !applyCamera) {
+      settledHero = -1;
+    }
   }
 
   function onPointerDown() {
@@ -311,7 +358,6 @@ export function attachHomeModelViewer(
   }
 
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
-  renderer.domElement.addEventListener("wheel", onWheel, { passive: false });
   window.addEventListener("resize", onResize);
   onResize();
   function animate() {
@@ -323,6 +369,40 @@ export function attachHomeModelViewer(
       modelRootRef.current.rotation.y =
         spin.fromY + (spin.toY - spin.fromY) * eased;
       if (t >= 1) exitSpinRef.current = null;
+    }
+
+    if (modelReady) {
+      const hero = THREE.MathUtils.clamp(activeHeroRef.current, 0, 2);
+      const goalPos =
+        hero === 0 ? hero0Position : hero === 1 ? hero1Position : hero2Position;
+      const goalTarget =
+        hero === 0 ? hero0Target : hero === 1 ? hero1Target : hero2Target;
+
+      if (hero === 2) {
+        controls.minPolarAngle = Math.PI * 0.12;
+        controls.maxPolarAngle = Math.PI * 0.52;
+      } else {
+        controls.minPolarAngle = Math.PI * 0.25;
+        controls.maxPolarAngle = Math.PI * 0.8;
+      }
+
+      if (hero !== settledHero) {
+        controls.autoRotate = false;
+        camera.position.lerp(goalPos, 0.078);
+        controls.target.lerp(goalTarget, 0.078);
+        if (
+          camera.position.distanceTo(goalPos) < 0.06 &&
+          controls.target.distanceTo(goalTarget) < 0.045
+        ) {
+          camera.position.copy(goalPos);
+          controls.target.copy(goalTarget);
+          settledHero = hero;
+        }
+      } else if (hero === 0) {
+        controls.autoRotate = !hasUserInteracted;
+      } else {
+        controls.autoRotate = false;
+      }
     }
 
     controls.update();
@@ -360,7 +440,6 @@ export function attachHomeModelViewer(
     cancelAnimationFrame(frameId);
     window.removeEventListener("resize", onResize);
     renderer?.domElement.removeEventListener("pointerdown", onPointerDown);
-    renderer?.domElement.removeEventListener("wheel", onWheel);
     controlsRef.current = null;
     modelRootRef.current = null;
     exitSpinRef.current = null;
