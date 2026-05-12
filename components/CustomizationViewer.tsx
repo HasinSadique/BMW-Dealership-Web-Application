@@ -35,13 +35,13 @@ const SCENE_BACKGROUND = 0x050915;
  * 车模型整体大小。
  * 数值越大，模型越大。
  */
-const MODEL_TARGET_SIZE = 9.6;
+const MODEL_TARGET_SIZE = 5;
 
 /**
  * 相机距离系数。
  * 数值越小，车越大。
  */
-const CAMERA_PADDING = 0.46;
+const CAMERA_PADDING = 0.9;
 
 /**
  * 车在画面里的填充比例。
@@ -126,7 +126,15 @@ export default function CustomizationViewer({
     doorsOpenRef.current = doorsOpen;
     windowsDownRef.current = windowsDown;
     lightsOnRef.current = lightsOn;
-  }, [exteriorColor, interiorColor, wheelColor, wheelStyle, doorsOpen, windowsDown, lightsOn]);
+  }, [
+    exteriorColor,
+    interiorColor,
+    wheelColor,
+    wheelStyle,
+    doorsOpen,
+    windowsDown,
+    lightsOn,
+  ]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -311,16 +319,40 @@ export default function CustomizationViewer({
         zoomCameraWithKeyboard(camera, controls, 1.18);
       } else if (event.key.toLowerCase() === "a") {
         event.preventDefault();
-        translateModelWithKeyboard(camera, modelRef.current, stageRef.current, -KEYBOARD_TRANSLATE_STEP, 0);
+        translateModelWithKeyboard(
+          camera,
+          modelRef.current,
+          stageRef.current,
+          -KEYBOARD_TRANSLATE_STEP,
+          0,
+        );
       } else if (event.key.toLowerCase() === "d") {
         event.preventDefault();
-        translateModelWithKeyboard(camera, modelRef.current, stageRef.current, KEYBOARD_TRANSLATE_STEP, 0);
+        translateModelWithKeyboard(
+          camera,
+          modelRef.current,
+          stageRef.current,
+          KEYBOARD_TRANSLATE_STEP,
+          0,
+        );
       } else if (event.key.toLowerCase() === "w") {
         event.preventDefault();
-        translateModelWithKeyboard(camera, modelRef.current, stageRef.current, 0, KEYBOARD_TRANSLATE_STEP);
+        translateModelWithKeyboard(
+          camera,
+          modelRef.current,
+          stageRef.current,
+          0,
+          KEYBOARD_TRANSLATE_STEP,
+        );
       } else if (event.key.toLowerCase() === "s") {
         event.preventDefault();
-        translateModelWithKeyboard(camera, modelRef.current, stageRef.current, 0, -KEYBOARD_TRANSLATE_STEP);
+        translateModelWithKeyboard(
+          camera,
+          modelRef.current,
+          stageRef.current,
+          0,
+          -KEYBOARD_TRANSLATE_STEP,
+        );
       }
     };
 
@@ -373,7 +405,8 @@ export default function CustomizationViewer({
     const threeScene = sceneRef.current;
     if (!threeScene) return;
 
-    const resolvedPath = modelPath ?? model.modelPath ?? pathMap[model.id] ?? "";
+    const resolvedPath =
+      modelPath ?? model.modelPath ?? pathMap[model.id] ?? "";
 
     const removeCurrentModel = () => {
       if (!modelRef.current) return;
@@ -453,7 +486,11 @@ export default function CustomizationViewer({
           exteriorColorRef.current,
           interiorColorRef.current,
         );
-        applyWheelCustomization(group, wheelColorRef.current, wheelStyleRef.current);
+        applyWheelCustomization(
+          group,
+          wheelColorRef.current,
+          wheelStyleRef.current,
+        );
         applyDoorState(group, doorsOpenRef.current);
         applyWindowState(group, windowsDownRef.current);
 
@@ -506,7 +543,11 @@ export default function CustomizationViewer({
     applyDoorState(modelRef.current, doorsOpenRef.current);
 
     if (interiorColor && previousInteriorColorRef.current !== interiorColor) {
-      focusCameraOnInterior(modelRef.current, cameraRef.current, controlsRef.current);
+      focusCameraOnInterior(
+        modelRef.current,
+        cameraRef.current,
+        controlsRef.current,
+      );
     }
 
     previousInteriorColorRef.current = interiorColor;
@@ -521,7 +562,11 @@ export default function CustomizationViewer({
       (wheelColor && previousWheelColorRef.current !== wheelColor) ||
       previousWheelStyleRef.current !== wheelStyle
     ) {
-      focusCameraOnWheels(modelRef.current, cameraRef.current, controlsRef.current);
+      focusCameraOnWheels(
+        modelRef.current,
+        cameraRef.current,
+        controlsRef.current,
+      );
     }
 
     previousWheelColorRef.current = wheelColor;
@@ -531,7 +576,11 @@ export default function CustomizationViewer({
   useEffect(() => {
     if (!modelRef.current || wheelFocusKey === 0) return;
 
-    focusCameraOnWheels(modelRef.current, cameraRef.current, controlsRef.current);
+    focusCameraOnWheels(
+      modelRef.current,
+      cameraRef.current,
+      controlsRef.current,
+    );
   }, [wheelFocusKey]);
 
   useEffect(() => {
@@ -540,7 +589,11 @@ export default function CustomizationViewer({
     applyDoorState(modelRef.current, doorsOpen);
 
     if (doorsOpen) {
-      focusCameraOnDoors(modelRef.current, cameraRef.current, controlsRef.current);
+      focusCameraOnDoors(
+        modelRef.current,
+        cameraRef.current,
+        controlsRef.current,
+      );
     }
   }, [doorsOpen]);
 
@@ -557,7 +610,11 @@ export default function CustomizationViewer({
     applySimulatedHeadlights(modelRef.current, lightsOn);
 
     if (lightsOn) {
-      focusCameraOnLights(modelRef.current, cameraRef.current, controlsRef.current);
+      focusCameraOnLights(
+        modelRef.current,
+        cameraRef.current,
+        controlsRef.current,
+      );
     }
   }, [lightsOn]);
 
@@ -782,8 +839,7 @@ function applyEmbeddedCarLights(root: THREE.Object3D, rootBox: THREE.Box3) {
 
   const totalLength = Math.abs(frontEdge - rearEdge);
   const totalWidth = Math.abs(
-    getAxisValue(rootBox.max, widthAxis) -
-      getAxisValue(rootBox.min, widthAxis),
+    getAxisValue(rootBox.max, widthAxis) - getAxisValue(rootBox.min, widthAxis),
   );
   const totalHeight = Math.abs(rootBox.max.y - rootBox.min.y);
 
@@ -873,7 +929,11 @@ function addEmbeddedOverlayToLightMesh({
     ? Math.floor(index.count / 3)
     : Math.floor(position.count / 3);
 
-  for (let triangleIndex = 0; triangleIndex < triangleCount; triangleIndex += 1) {
+  for (
+    let triangleIndex = 0;
+    triangleIndex < triangleCount;
+    triangleIndex += 1
+  ) {
     const ia = getTriangleVertexIndex(index, triangleIndex, 0);
     const ib = getTriangleVertexIndex(index, triangleIndex, 1);
     const ic = getTriangleVertexIndex(index, triangleIndex, 2);
@@ -901,7 +961,11 @@ function addEmbeddedOverlayToLightMesh({
       continue;
     }
 
-    localCenter.copy(localA).add(localB).add(localC).multiplyScalar(1 / 3);
+    localCenter
+      .copy(localA)
+      .add(localB)
+      .add(localC)
+      .multiplyScalar(1 / 3);
 
     const rootPoint = toRootSpace(localCenter, mesh, root);
     if (!isFiniteVector3(rootPoint)) continue;
@@ -1219,7 +1283,6 @@ function applyColorsToScene(
 
         return;
       }
-
     });
   });
 }
@@ -1252,7 +1315,6 @@ function isExteriorMaterialName(name: string) {
     name.includes("skin_base")
   );
 }
-
 
 type CarMetrics = {
   box: THREE.Box3;
@@ -1317,7 +1379,10 @@ function getCleanWorldBox(root: THREE.Object3D) {
 }
 
 function isCustomizationHelper(obj: THREE.Object3D) {
-  return obj.name.startsWith("__custom_") || Boolean(obj.userData?.__customizationHelper);
+  return (
+    obj.name.startsWith("__custom_") ||
+    Boolean(obj.userData?.__customizationHelper)
+  );
 }
 
 function moveCameraTo(
@@ -1340,7 +1405,11 @@ function moveCameraTo(
     controls.target.copy(target);
     const currentDistance = position.distanceTo(target);
     controls.minDistance = minDistance;
-    controls.maxDistance = Math.max(maxDistance ?? currentDistance * 3, currentDistance * 3, 6);
+    controls.maxDistance = Math.max(
+      maxDistance ?? currentDistance * 3,
+      currentDistance * 3,
+      6,
+    );
     controls.update();
   }
 }
@@ -1355,7 +1424,13 @@ function focusCameraOnWheels(
   const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
   const width = Math.abs(metrics.widthMax - metrics.widthMin);
   const anchor = anchors[0];
-  const target = anchor?.center.clone() ?? new THREE.Vector3(metrics.center.x, metrics.box.min.y + metrics.size.y * 0.24, metrics.center.z);
+  const target =
+    anchor?.center.clone() ??
+    new THREE.Vector3(
+      metrics.center.x,
+      metrics.box.min.y + metrics.size.y * 0.24,
+      metrics.center.z,
+    );
   const radius = anchor?.radius ?? Math.max(metrics.size.y * 0.16, 0.55);
 
   if (!anchor) {
@@ -1370,14 +1445,23 @@ function focusCameraOnWheels(
    */
   target.y += radius * 0.04;
 
-  const sideDirection = getAxisValue(target, metrics.widthAxis) >=
+  const sideDirection =
+    getAxisValue(target, metrics.widthAxis) >=
     (metrics.widthMin + metrics.widthMax) / 2
-    ? 1
-    : -1;
+      ? 1
+      : -1;
   const distance = Math.max(radius * 3.4, width * 0.48, metrics.size.y * 0.7);
   const position = target.clone();
-  setAxisValue(position, metrics.lengthAxis, getAxisValue(target, metrics.lengthAxis) + length * 0.08);
-  setAxisValue(position, metrics.widthAxis, getAxisValue(target, metrics.widthAxis) + sideDirection * distance);
+  setAxisValue(
+    position,
+    metrics.lengthAxis,
+    getAxisValue(target, metrics.lengthAxis) + length * 0.08,
+  );
+  setAxisValue(
+    position,
+    metrics.widthAxis,
+    getAxisValue(target, metrics.widthAxis) + sideDirection * distance,
+  );
   position.y = target.y + radius * 0.18;
 
   /**
@@ -1385,7 +1469,12 @@ function focusCameraOnWheels(
    * whole car. Keep the close wheel framing, but set a full-car max zoom range
    * instead of capping OrbitControls around the close-up distance.
    */
-  const wholeCarZoomDistance = Math.max(length * 2.4, width * 4.2, metrics.size.y * 7.5, distance * 8);
+  const wholeCarZoomDistance = Math.max(
+    length * 2.4,
+    width * 4.2,
+    metrics.size.y * 7.5,
+    distance * 8,
+  );
 
   moveCameraTo(
     camera,
@@ -1423,15 +1512,26 @@ function focusCameraOnInterior(
   position.y = metrics.box.min.y + metrics.size.y * 0.86;
 
   applyInteriorPreviewLight(group, target);
-  moveCameraTo(camera, controls, position, target, 0.45, Math.max(length * 2.2, width * 4.2, 8));
+  moveCameraTo(
+    camera,
+    controls,
+    position,
+    target,
+    0.45,
+    Math.max(length * 2.2, width * 4.2, 8),
+  );
 }
 
-function applyInteriorPreviewLight(group: THREE.Group, worldTarget: THREE.Vector3) {
+function applyInteriorPreviewLight(
+  group: THREE.Group,
+  worldTarget: THREE.Vector3,
+) {
   removeCustomChildren(group, "__custom_interior_preview_light");
 
   const metrics = getCarMetrics(group);
   const scale = getUniformWorldScale(group);
-  const lightDistance = Math.max(metrics.size.x, metrics.size.y, metrics.size.z) * 0.75;
+  const lightDistance =
+    Math.max(metrics.size.x, metrics.size.y, metrics.size.z) * 0.75;
   const localTarget = group.worldToLocal(worldTarget.clone());
 
   const cabinPoint = new THREE.PointLight("#f5fbff", 95, lightDistance, 1.05);
@@ -1441,7 +1541,14 @@ function applyInteriorPreviewLight(group: THREE.Group, worldTarget: THREE.Vector
   cabinPoint.position.y += (metrics.size.y * 0.12) / scale;
   group.add(cabinPoint);
 
-  const softFill = new THREE.SpotLight("#d9ecff", 70, lightDistance * 1.4, Math.PI / 3.2, 0.72, 1.1);
+  const softFill = new THREE.SpotLight(
+    "#d9ecff",
+    70,
+    lightDistance * 1.4,
+    Math.PI / 3.2,
+    0.72,
+    1.1,
+  );
   softFill.name = "__custom_interior_preview_light";
   softFill.userData.__customizationHelper = true;
   softFill.position.copy(localTarget);
@@ -1461,7 +1568,11 @@ function focusCameraOnDoors(
 ) {
   const metrics = getCarMetrics(group);
   const width = Math.abs(metrics.widthMax - metrics.widthMin);
-  const target = new THREE.Vector3(metrics.center.x, metrics.box.min.y + metrics.size.y * 0.48, metrics.center.z);
+  const target = new THREE.Vector3(
+    metrics.center.x,
+    metrics.box.min.y + metrics.size.y * 0.48,
+    metrics.center.z,
+  );
   setAxisValue(target, metrics.widthAxis, metrics.widthMax);
 
   const position = target.clone();
@@ -1478,7 +1589,11 @@ function focusCameraOnLights(
 ) {
   const metrics = getCarMetrics(group);
   const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
-  const target = new THREE.Vector3(metrics.center.x, metrics.box.min.y + metrics.size.y * 0.44, metrics.center.z);
+  const target = new THREE.Vector3(
+    metrics.center.x,
+    metrics.box.min.y + metrics.size.y * 0.44,
+    metrics.center.z,
+  );
   const front = FRONT_SIGN === 1 ? metrics.lengthMax : metrics.lengthMin;
   setAxisValue(target, metrics.lengthAxis, front);
 
@@ -1546,7 +1661,12 @@ function cloneMeshMaterials(mesh: THREE.Mesh) {
 
 function findWheelAnchors(group: THREE.Group): WheelAnchor[] {
   const metrics = getCarMetrics(group);
-  const maxModelAxis = Math.max(metrics.size.x, metrics.size.y, metrics.size.z, 1);
+  const maxModelAxis = Math.max(
+    metrics.size.x,
+    metrics.size.y,
+    metrics.size.z,
+    1,
+  );
   const wheelBoxes = new Map<string, THREE.Box3>();
 
   group.traverse((obj) => {
@@ -1562,19 +1682,26 @@ function findWheelAnchors(group: THREE.Group): WheelAnchor[] {
     const maxDim = Math.max(size.x, size.y, size.z);
     const minDim = Math.min(size.x, size.y, size.z);
 
-    if (!Number.isFinite(maxDim) || maxDim <= 0 || maxDim > maxModelAxis * 0.45 || minDim <= 0) {
+    if (
+      !Number.isFinite(maxDim) ||
+      maxDim <= 0 ||
+      maxDim > maxModelAxis * 0.45 ||
+      minDim <= 0
+    ) {
       return;
     }
 
     const center = box.getCenter(new THREE.Vector3());
-    const side = getAxisValue(center, metrics.widthAxis) >=
+    const side =
+      getAxisValue(center, metrics.widthAxis) >=
       (metrics.widthMin + metrics.widthMax) / 2
-      ? "right"
-      : "left";
-    const axle = getAxisValue(center, metrics.lengthAxis) >=
+        ? "right"
+        : "left";
+    const axle =
+      getAxisValue(center, metrics.lengthAxis) >=
       (metrics.lengthMin + metrics.lengthMax) / 2
-      ? "front"
-      : "rear";
+        ? "front"
+        : "rear";
     const key = `${side}-${axle}`;
     const existing = wheelBoxes.get(key);
 
@@ -1599,7 +1726,10 @@ function findWheelAnchors(group: THREE.Group): WheelAnchor[] {
     const bSide = getAxisValue(b.center, metrics.widthAxis);
     const sideSort = bSide - aSide;
     if (Math.abs(sideSort) > 0.01) return sideSort;
-    return getAxisValue(b.center, metrics.lengthAxis) - getAxisValue(a.center, metrics.lengthAxis);
+    return (
+      getAxisValue(b.center, metrics.lengthAxis) -
+      getAxisValue(a.center, metrics.lengthAxis)
+    );
   });
 
   return anchors.slice(0, 4);
@@ -1635,7 +1765,9 @@ function restoreOriginalDoorTransform(obj: THREE.Object3D) {
   }
 
   obj.position.copy(obj.userData.__customOriginalPosition as THREE.Vector3);
-  obj.quaternion.copy(obj.userData.__customOriginalQuaternion as THREE.Quaternion);
+  obj.quaternion.copy(
+    obj.userData.__customOriginalQuaternion as THREE.Quaternion,
+  );
   obj.scale.copy(obj.userData.__customOriginalScale as THREE.Vector3);
   obj.updateMatrixWorld(true);
 }
@@ -1654,10 +1786,12 @@ function rotateRealDoorAroundComputedHinge(
 
   const doorCenter = doorBox.getCenter(new THREE.Vector3());
   const sideCenter = (metrics.widthMin + metrics.widthMax) / 2;
-  const sideSign = getAxisValue(doorCenter, metrics.widthAxis) >= sideCenter ? 1 : -1;
-  const hingeLength = FRONT_SIGN === 1
-    ? getAxisValue(doorBox.max, metrics.lengthAxis)
-    : getAxisValue(doorBox.min, metrics.lengthAxis);
+  const sideSign =
+    getAxisValue(doorCenter, metrics.widthAxis) >= sideCenter ? 1 : -1;
+  const hingeLength =
+    FRONT_SIGN === 1
+      ? getAxisValue(doorBox.max, metrics.lengthAxis)
+      : getAxisValue(doorBox.min, metrics.lengthAxis);
   const hingePoint = doorCenter.clone();
   setAxisValue(hingePoint, metrics.lengthAxis, hingeLength);
 
@@ -1667,7 +1801,13 @@ function rotateRealDoorAroundComputedHinge(
   const hingeRotation = new THREE.Matrix4()
     .makeTranslation(hingePoint.x, hingePoint.y, hingePoint.z)
     .multiply(new THREE.Matrix4().makeRotationY(openAngle))
-    .multiply(new THREE.Matrix4().makeTranslation(-hingePoint.x, -hingePoint.y, -hingePoint.z));
+    .multiply(
+      new THREE.Matrix4().makeTranslation(
+        -hingePoint.x,
+        -hingePoint.y,
+        -hingePoint.z,
+      ),
+    );
   const newWorld = hingeRotation.multiply(originalWorld);
   const newLocal = parentWorldInverse.multiply(newWorld);
 
@@ -1692,7 +1832,8 @@ function applyWindowState(group: THREE.Group, down: boolean) {
       obj.userData.__customOriginalPosition = obj.position.clone();
     }
 
-    const originalPosition = obj.userData.__customOriginalPosition as THREE.Vector3;
+    const originalPosition = obj.userData
+      .__customOriginalPosition as THREE.Vector3;
     obj.position.copy(originalPosition);
     if (down && name.includes("window")) {
       obj.position.y -= 0.28;
@@ -1702,12 +1843,17 @@ function applyWindowState(group: THREE.Group, down: boolean) {
       const mat = material as any;
 
       if (mat.opacity !== undefined) {
-        if (mat.userData && mat.userData.__customOriginalOpacity === undefined) {
+        if (
+          mat.userData &&
+          mat.userData.__customOriginalOpacity === undefined
+        ) {
           mat.userData.__customOriginalOpacity = mat.opacity;
         }
 
         mat.transparent = true;
-        mat.opacity = down ? 0.08 : (mat.userData?.__customOriginalOpacity ?? mat.opacity);
+        mat.opacity = down
+          ? 0.08
+          : (mat.userData?.__customOriginalOpacity ?? mat.opacity);
         mat.depthWrite = !down;
       }
 
@@ -1726,17 +1872,29 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
   const width = Math.abs(metrics.widthMax - metrics.widthMin);
   const front = FRONT_SIGN === 1 ? metrics.lengthMax : metrics.lengthMin;
   const lightY = metrics.box.min.y + metrics.size.y * 0.38;
-  const fallbackLightWidths = [metrics.widthMin + width * 0.28, metrics.widthMax - width * 0.28];
+  const fallbackLightWidths = [
+    metrics.widthMin + width * 0.28,
+    metrics.widthMax - width * 0.28,
+  ];
   const direction = FRONT_SIGN === 1 ? 1 : -1;
   const headlightAnchors = findHeadlightAnchors(group, metrics);
-  const lightPositions = headlightAnchors.length > 0
-    ? headlightAnchors
-    : fallbackLightWidths.map((widthPos) => {
-        const worldBulb = new THREE.Vector3(metrics.center.x, lightY, metrics.center.z);
-        setAxisValue(worldBulb, metrics.lengthAxis, front - direction * length * 0.035);
-        setAxisValue(worldBulb, metrics.widthAxis, widthPos);
-        return worldBulb;
-      });
+  const lightPositions =
+    headlightAnchors.length > 0
+      ? headlightAnchors
+      : fallbackLightWidths.map((widthPos) => {
+          const worldBulb = new THREE.Vector3(
+            metrics.center.x,
+            lightY,
+            metrics.center.z,
+          );
+          setAxisValue(
+            worldBulb,
+            metrics.lengthAxis,
+            front - direction * length * 0.035,
+          );
+          setAxisValue(worldBulb, metrics.widthAxis, widthPos);
+          return worldBulb;
+        });
 
   lightPositions.forEach((worldBulb) => {
     /**
@@ -1746,7 +1904,12 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
     const bulbRadius = Math.max(width * 0.022, metrics.size.y * 0.018) / scale;
     const bulb = new THREE.Mesh(
       new THREE.SphereGeometry(bulbRadius, 32, 16),
-      new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 1, toneMapped: false }),
+      new THREE.MeshBasicMaterial({
+        color: "#ffffff",
+        transparent: true,
+        opacity: 1,
+        toneMapped: false,
+      }),
     );
     bulb.name = "__custom_headlight_proxy";
     bulb.userData.__customizationHelper = true;
@@ -1771,7 +1934,13 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
 
     const beamLength = (length * 0.42) / scale;
     const beam = new THREE.Mesh(
-      new THREE.ConeGeometry(Math.max(width * 0.08, 0.1) / scale, beamLength, 36, 1, true),
+      new THREE.ConeGeometry(
+        Math.max(width * 0.08, 0.1) / scale,
+        beamLength,
+        36,
+        1,
+        true,
+      ),
       new THREE.MeshBasicMaterial({
         color: "#8fd3ff",
         transparent: true,
@@ -1788,14 +1957,23 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
     setAxisValue(
       worldBeamCenter,
       metrics.lengthAxis,
-      getAxisValue(worldBeamCenter, metrics.lengthAxis) + direction * length * 0.21,
+      getAxisValue(worldBeamCenter, metrics.lengthAxis) +
+        direction * length * 0.21,
     );
     beam.position.copy(group.worldToLocal(worldBeamCenter));
     beam.rotation.x = metrics.lengthAxis === "z" ? Math.PI / 2 : 0;
-    beam.rotation.z = metrics.lengthAxis === "x" ? -direction * Math.PI / 2 : 0;
+    beam.rotation.z =
+      metrics.lengthAxis === "x" ? (-direction * Math.PI) / 2 : 0;
     group.add(beam);
 
-    const spot = new THREE.SpotLight("#dff4ff", 42, length * 1.8, Math.PI / 8, 0.5, 0.95);
+    const spot = new THREE.SpotLight(
+      "#dff4ff",
+      42,
+      length * 1.8,
+      Math.PI / 8,
+      0.5,
+      0.95,
+    );
     spot.name = "__custom_headlight_proxy";
     spot.userData.__customizationHelper = true;
     spot.position.copy(bulb.position);
@@ -1803,7 +1981,11 @@ function applySimulatedHeadlights(group: THREE.Group, on: boolean) {
     target.name = "__custom_headlight_proxy";
     target.userData.__customizationHelper = true;
     const worldTarget = worldBulb.clone();
-    setAxisValue(worldTarget, metrics.lengthAxis, front + direction * length * 0.9);
+    setAxisValue(
+      worldTarget,
+      metrics.lengthAxis,
+      front + direction * length * 0.9,
+    );
     target.position.copy(group.worldToLocal(worldTarget));
     group.add(spot, target);
     spot.target = target;
@@ -1825,7 +2007,10 @@ function findHeadlightAnchors(group: THREE.Group, metrics: CarMetrics) {
       name.includes("headlight") ||
       name.includes("head_light") ||
       name.includes("drl") ||
-      (name.includes("light") && !name.includes("tail") && !name.includes("rear") && !name.includes("brake"));
+      (name.includes("light") &&
+        !name.includes("tail") &&
+        !name.includes("rear") &&
+        !name.includes("brake"));
 
     if (!isHeadlight || name.includes("reflector")) return;
 
@@ -1836,15 +2021,22 @@ function findHeadlightAnchors(group: THREE.Group, metrics: CarMetrics) {
     const center = box.getCenter(new THREE.Vector3());
     const lengthValue = getAxisValue(center, metrics.lengthAxis);
     const distanceFromFront = Math.abs(front - lengthValue);
-    const relativeHeight = (center.y - metrics.box.min.y) / Math.max(metrics.size.y, 0.0001);
+    const relativeHeight =
+      (center.y - metrics.box.min.y) / Math.max(metrics.size.y, 0.0001);
 
-    if (distanceFromFront > length * 0.26 || relativeHeight < 0.2 || relativeHeight > 0.72) {
+    if (
+      distanceFromFront > length * 0.26 ||
+      relativeHeight < 0.2 ||
+      relativeHeight > 0.72
+    ) {
       return;
     }
 
-    const side = getAxisValue(center, metrics.widthAxis) >= (metrics.widthMin + metrics.widthMax) / 2
-      ? "right"
-      : "left";
+    const side =
+      getAxisValue(center, metrics.widthAxis) >=
+      (metrics.widthMin + metrics.widthMax) / 2
+        ? "right"
+        : "left";
     const existing = sideBoxes.get(side);
     if (existing) {
       existing.union(box);
@@ -1858,10 +2050,17 @@ function findHeadlightAnchors(group: THREE.Group, metrics: CarMetrics) {
       const center = box.getCenter(new THREE.Vector3());
       // Nudge the helper slightly outward from the body skin, but keep it on the
       // actual light cluster rather than floating in front of the bumper.
-      setAxisValue(center, metrics.lengthAxis, getAxisValue(center, metrics.lengthAxis) + direction * length * 0.006);
+      setAxisValue(
+        center,
+        metrics.lengthAxis,
+        getAxisValue(center, metrics.lengthAxis) + direction * length * 0.006,
+      );
       return center;
     })
-    .sort((a, b) => getAxisValue(a, metrics.widthAxis) - getAxisValue(b, metrics.widthAxis));
+    .sort(
+      (a, b) =>
+        getAxisValue(a, metrics.widthAxis) - getAxisValue(b, metrics.widthAxis),
+    );
 }
 
 function setEmbeddedLightVisibility(group: THREE.Group, visible: boolean) {
