@@ -19,6 +19,7 @@ export default function CustomizationApp({ model }: Props) {
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [windowsDown, setWindowsDown] = useState(false);
   const [lightsOn, setLightsOn] = useState(false);
+  const [roofLightOn, setRoofLightOn] = useState(true);
   const [wheelFocusKey, setWheelFocusKey] = useState(0);
 
   const focusWheelAfterSelection = () => {
@@ -60,6 +61,7 @@ export default function CustomizationApp({ model }: Props) {
             doorsOpen={doorsOpen}
             windowsDown={windowsDown}
             lightsOn={lightsOn}
+            roofLightOn={roofLightOn}
             wheelFocusKey={wheelFocusKey}
           />
         </div>
@@ -71,6 +73,7 @@ export default function CustomizationApp({ model }: Props) {
             doorsOpen={doorsOpen}
             windowsDown={windowsDown}
             lightsOn={lightsOn}
+            roofLightOn={roofLightOn}
             driveAwayHref={driveAwayHref}
             onExteriorChange={(c: string) => setExterior(c)}
             onInteriorChange={(c: string) => setInterior(c)}
@@ -85,6 +88,7 @@ export default function CustomizationApp({ model }: Props) {
             onDoorsOpenChange={setDoorsOpen}
             onWindowsDownChange={setWindowsDown}
             onLightsOnChange={setLightsOn}
+            onRoofLightChange={setRoofLightOn}
           />
         </div>
       </div>

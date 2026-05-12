@@ -17,6 +17,7 @@ type Props = {
   doorsOpen?: boolean;
   windowsDown?: boolean;
   lightsOn?: boolean;
+  roofLightOn?: boolean;
   wheelFocusKey?: number;
 };
 
@@ -92,6 +93,7 @@ export default function CustomizationViewer({
   doorsOpen = false,
   windowsDown = false,
   lightsOn = false,
+  roofLightOn = true,
   wheelFocusKey = 0,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -114,6 +116,7 @@ export default function CustomizationViewer({
   const doorsOpenRef = useRef(doorsOpen);
   const windowsDownRef = useRef(windowsDown);
   const lightsOnRef = useRef(lightsOn);
+  const roofLightOnRef = useRef(roofLightOn);
   const previousInteriorColorRef = useRef<string | undefined>(interiorColor);
   const previousWheelColorRef = useRef<string | undefined>(wheelColor);
   const previousWheelStyleRef = useRef<WheelStyle>(wheelStyle);
@@ -547,6 +550,7 @@ export default function CustomizationViewer({
         modelRef.current,
         cameraRef.current,
         controlsRef.current,
+        roofLightOnRef.current,
       );
     }
 
@@ -617,6 +621,12 @@ export default function CustomizationViewer({
       );
     }
   }, [lightsOn]);
+
+  useEffect(() => {
+    if (!modelRef.current) return;
+
+    applyRoofPreviewLightState(modelRef.current, roofLightOn);
+  }, [roofLightOn]);
 
   const resolvedPath = modelPath ?? model.modelPath ?? pathMap[model.id] ?? "";
 
@@ -1490,16 +1500,12 @@ function focusCameraOnInterior(
   group: THREE.Group,
   camera: THREE.PerspectiveCamera | null,
   controls: OrbitControls | null,
+  roofLightOn = true,
 ) {
   const metrics = getCarMetrics(group);
   const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
   const width = Math.abs(metrics.widthMax - metrics.widthMin);
-  const target = new THREE.Vector3(
-    metrics.center.x,
-    metrics.box.min.y + metrics.size.y * 0.58,
-    metrics.center.z,
-  );
-  setAxisValue(target, metrics.lengthAxis, metrics.lengthMin + length * 0.5);
+  const target = getInteriorPreviewTarget(group);
 
   /**
    * Use an elevated front-quarter cabin view instead of placing the camera deep
@@ -1511,21 +1517,32 @@ function focusCameraOnInterior(
   setAxisValue(position, metrics.widthAxis, metrics.widthMax + width * 0.28);
   position.y = metrics.box.min.y + metrics.size.y * 0.86;
 
-  applyInteriorPreviewLight(group, target);
-  moveCameraTo(
-    camera,
-    controls,
-    position,
-    target,
-    0.45,
-    Math.max(length * 2.2, width * 4.2, 8),
-  );
+  applyRoofPreviewLightState(group, roofLightOn);
+  moveCameraTo(camera, controls, position, target, 0.45, Math.max(length * 2.2, width * 4.2, 8));
 }
 
-function applyInteriorPreviewLight(
-  group: THREE.Group,
-  worldTarget: THREE.Vector3,
-) {
+function applyRoofPreviewLightState(group: THREE.Group, enabled: boolean) {
+  removeCustomChildren(group, "__custom_interior_preview_light");
+
+  if (!enabled) return;
+
+  applyInteriorPreviewLight(group, getInteriorPreviewTarget(group));
+}
+
+function getInteriorPreviewTarget(group: THREE.Group) {
+  const metrics = getCarMetrics(group);
+  const length = Math.abs(metrics.lengthMax - metrics.lengthMin);
+  const target = new THREE.Vector3(
+    metrics.center.x,
+    metrics.box.min.y + metrics.size.y * 0.58,
+    metrics.center.z,
+  );
+  setAxisValue(target, metrics.lengthAxis, metrics.lengthMin + length * 0.5);
+
+  return target;
+}
+
+function applyInteriorPreviewLight(group: THREE.Group, worldTarget: THREE.Vector3) {
   removeCustomChildren(group, "__custom_interior_preview_light");
 
   const metrics = getCarMetrics(group);
