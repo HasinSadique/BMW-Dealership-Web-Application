@@ -35,13 +35,13 @@ const SCENE_BACKGROUND = 0x050915;
  * 车模型整体大小。
  * 数值越大，模型越大。
  */
-const MODEL_TARGET_SIZE = 9.6;
+const MODEL_TARGET_SIZE = 4.6;
 
 /**
  * 相机距离系数。
  * 数值越小，车越大。
  */
-const CAMERA_PADDING = 0.46;
+const CAMERA_PADDING = 0.80;
 
 /**
  * 车在画面里的填充比例。
