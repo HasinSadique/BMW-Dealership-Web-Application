@@ -11,6 +11,7 @@ type CustomizationPanelProps = {
   doorsOpen: boolean;
   windowsDown: boolean;
   lightsOn: boolean;
+  roofLightOn: boolean;
   driveAwayHref: string;
   onExteriorChange?: (hex: string) => void;
   onInteriorChange?: (hex: string) => void;
@@ -19,7 +20,10 @@ type CustomizationPanelProps = {
   onDoorsOpenChange?: (open: boolean) => void;
   onWindowsDownChange?: (down: boolean) => void;
   onLightsOnChange?: (on: boolean) => void;
+  onRoofLightChange?: (on: boolean) => void;
 };
+
+type SectionKey = "paint" | "wheels" | "interior" | "features";
 
 const colorOptions: Record<string, string> = {
   "Alpine White": "#F8F8F4",
@@ -56,6 +60,7 @@ export default function CustomizationPanel({
   doorsOpen,
   windowsDown,
   lightsOn,
+  roofLightOn,
   driveAwayHref,
   onExteriorChange,
   onInteriorChange,
@@ -64,9 +69,14 @@ export default function CustomizationPanel({
   onDoorsOpenChange,
   onWindowsDownChange,
   onLightsOnChange,
+  onRoofLightChange,
 }: CustomizationPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<SectionKey | null>(null);
   const hasRealDoorNodes = !["bmw-z8", "bmw-m3-cs-touring", "bmw-m3-topaz", "bmw-x5"].includes(model.id);
+  const toggleSection = (section: SectionKey) => {
+    setExpandedSection((current) => (current === section ? null : section));
+  };
 
   return (
     <>
@@ -92,8 +102,11 @@ export default function CustomizationPanel({
             </button>
           </div>
 
-          <section className="mb-5">
-            <h3 className="mb-2 text-sm font-semibold">Paint</h3>
+          <AccordionSection
+            title="Paint"
+            isExpanded={expandedSection === "paint"}
+            onToggle={() => toggleSection("paint")}
+          >
             {Object.keys(colorOptions).map((label) => (
               <button
                 key={label}
@@ -104,10 +117,13 @@ export default function CustomizationPanel({
                 <span>{label}</span>
               </button>
             ))}
-          </section>
+          </AccordionSection>
 
-          <section className="mb-5">
-            <h3 className="mb-2 text-sm font-semibold">Wheels</h3>
+          <AccordionSection
+            title="Wheels"
+            isExpanded={expandedSection === "wheels"}
+            onToggle={() => toggleSection("wheels")}
+          >
             <p className="mb-2 text-xs text-slate-400">
               Change wheel finish or style. The camera zooms to the car’s actual wheel after selection.
             </p>
@@ -132,10 +148,13 @@ export default function CustomizationPanel({
                 </button>
               ))}
             </div>
-          </section>
+          </AccordionSection>
 
-          <section className="mb-5">
-            <h3 className="mb-2 text-sm font-semibold">Interior</h3>
+          <AccordionSection
+            title="Interior"
+            isExpanded={expandedSection === "interior"}
+            onToggle={() => toggleSection("interior")}
+          >
             <p className="mb-2 text-xs text-slate-400">
               Selecting an interior color moves the camera into the cabin.
             </p>
@@ -149,10 +168,13 @@ export default function CustomizationPanel({
                 <span>{label}</span>
               </button>
             ))}
-          </section>
+          </AccordionSection>
 
-          <section className="mb-5">
-            <h3 className="mb-2 text-sm font-semibold">Interactive Features</h3>
+          <AccordionSection
+            title="Interactive Features"
+            isExpanded={expandedSection === "features"}
+            onToggle={() => toggleSection("features")}
+          >
             <div className="space-y-2">
               <ToggleButton
                 active={doorsOpen}
@@ -169,8 +191,11 @@ export default function CustomizationPanel({
               <ToggleButton active={lightsOn} onClick={() => onLightsOnChange?.(!lightsOn)}>
                 {lightsOn ? "Turn lights off" : "Turn lights on"}
               </ToggleButton>
+              <ToggleButton active={roofLightOn} onClick={() => onRoofLightChange?.(!roofLightOn)}>
+                {roofLightOn ? "Turn roof light off" : "Turn roof light on"}
+              </ToggleButton>
             </div>
-          </section>
+          </AccordionSection>
 
           <section className="mt-6 border-t border-white/10 pt-4">
             <Link
@@ -218,5 +243,45 @@ function ToggleButton({
     >
       {children}
     </button>
+  );
+}
+
+function AccordionSection({
+  title,
+  isExpanded,
+  children,
+  onToggle,
+}: {
+  title: string;
+  isExpanded: boolean;
+  children: ReactNode;
+  onToggle: () => void;
+}) {
+  return (
+    <section className="mb-3 overflow-hidden rounded-lg border border-white/15 bg-[rgba(9,18,31,0.42)]">
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+      >
+        <span>{title}</span>
+        <span
+          aria-hidden="true"
+          className={`text-lg leading-none text-[#8cc8ff] transition-transform ${isExpanded ? "rotate-45" : ""}`}
+        >
+          +
+        </span>
+      </button>
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ${
+          isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="border-t border-white/10 px-3 pb-3 pt-3">{children}</div>
+        </div>
+      </div>
+    </section>
   );
 }
