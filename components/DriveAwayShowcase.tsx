@@ -5,6 +5,17 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { CarModel } from "@/data/models";
 import type { WheelStyle } from "./CustomizationApp";
+import {
+  calculateDriftFrame,
+  DRIFT_CENTER,
+  DRIFT_RADIUS,
+  FINAL_REVEAL_TIME,
+} from "./drive-away/driftMotion";
+import {
+  createDriftSmoke,
+  spawnDriftSmoke,
+  updateDriftSmoke,
+} from "./drive-away/driftSmoke";
 
 type DriveAwayShowcaseProps = {
   model: CarModel;
@@ -17,14 +28,6 @@ type DriveAwayShowcaseProps = {
   lightsOn?: boolean;
 };
 
-type SmokePuff = {
-  sprite: THREE.Sprite;
-  bornAt: number;
-  life: number;
-  velocity: THREE.Vector3;
-  size: number;
-};
-
 const pathMap: Record<string, string> = {
   "bmw-m3-cs-touring": "/models/2025_bmw_m3_cs_touring.glb",
   "bmw-m4-competition": "/models/2025_bmw_m4_competition.glb",
@@ -34,12 +37,7 @@ const pathMap: Record<string, string> = {
   "bmw-z8": "/models/bmw_z8__www.vecarz.com.glb",
 };
 
-const DRIFT_DURATION = 20.2;
-const CAMERA_SETTLE_DURATION = 2.4;
-const FINAL_REVEAL_TIME = DRIFT_DURATION + CAMERA_SETTLE_DURATION;
-const DRIFT_RADIUS = 5.2;
-const DRIFT_LOOPS = 5;
-const SMOKE_PUFF_COUNT = 64;
+const DRIVE_AWAY_MODEL_SIZE = 3.15;
 const DRIVE_AWAY_AUDIO_SRC =
   "/audio/Tokyo%20Drift%20-%20Teriyaki%20Boyz%20%5B%20MUSIC%20VIDEO%20%5D%20HD.mp3";
 
@@ -170,6 +168,7 @@ export default function DriveAwayShowcase({
     let animationId = 0;
     let loadedCar: THREE.Group | null = null;
     let completionAnnounced = false;
+    let handoffStartTime: number | null = null;
     const loader = new GLTFLoader();
 
     if (resolvedPath) {
@@ -182,7 +181,7 @@ export default function DriveAwayShowcase({
           }
 
           const modelScene = gltf.scene;
-          normalizeCarModel(modelScene, 4.8);
+          normalizeCarModel(modelScene, DRIVE_AWAY_MODEL_SIZE);
           applyDriveAwayConfiguration(
             modelScene,
             exteriorColor,
@@ -225,52 +224,47 @@ export default function DriveAwayShowcase({
     }
 
     const clock = new THREE.Clock();
-    const cameraTarget = new THREE.Vector3();
-    const finalTarget = new THREE.Vector3(0.15, 1.1, 0);
-    const finalCamera = new THREE.Vector3(-2.3, 0.95, 2.85);
-    const overheadCamera = new THREE.Vector3(0, 10.5, 0.1);
     let lastSmokeSpawn = 0;
 
     const animate = () => {
       const t = clock.getElapsedTime();
-      const driftProgress = Math.min(t / DRIFT_DURATION, 1);
-      const transitionProgress = smoothstep(
-        THREE.MathUtils.clamp((t - DRIFT_DURATION) / CAMERA_SETTLE_DURATION, 0, 1),
-      );
-      const orbit = -Math.PI / 2 + driftProgress * Math.PI * 2 * DRIFT_LOOPS;
-      const driftX = Math.cos(orbit) * DRIFT_RADIUS;
-      const driftZ = Math.sin(orbit) * DRIFT_RADIUS;
-      const finalX = 0;
-      const finalZ = 0;
-      const x = THREE.MathUtils.lerp(driftX, finalX, transitionProgress);
-      const z = THREE.MathUtils.lerp(driftZ, finalZ, transitionProgress);
-      const driftHeading = -orbit + Math.PI / 2 + 0.72 + Math.sin(t * 3.2) * 0.12;
-      const finalHeading = Math.PI * 0.74;
+      if (loadedCar && handoffStartTime === null) {
+        handoffStartTime = t;
+      }
 
-      carRoot.position.set(x, 0, z);
-      carRoot.rotation.y = lerpAngle(driftHeading, finalHeading, transitionProgress);
-      carRoot.rotation.z = Math.sin(t * 3.5) * 0.045 * (1 - transitionProgress);
+      const handoffElapsed = handoffStartTime === null ? 0 : t - handoffStartTime;
+      const driftFrame = calculateDriftFrame(handoffElapsed, t, camera);
+
+      carRoot.position.copy(driftFrame.position);
+      carRoot.rotation.z = driftFrame.bodyRoll;
 
       if (loadedCar) {
-        loadedCar.rotation.x = Math.sin(t * 4.2) * 0.012 * (1 - transitionProgress);
+        loadedCar.rotation.x = driftFrame.modelPitch;
       }
 
       tireMarks.forEach((mark, index) => {
         const material = mark.material as THREE.MeshBasicMaterial;
-        material.opacity = 0.1 + Math.min(driftProgress * 1.5, 1) * (index === 0 ? 0.52 : 0.34);
+        material.opacity =
+          0.1 +
+          Math.min(driftFrame.driftProgress * 1.5, 1) *
+            (index === 0 ? 0.52 : 0.34);
       });
-      if (driftProgress < 0.98 && transitionProgress < 0.1 && t - lastSmokeSpawn > 0.085) {
-        spawnDriftSmoke(smokePuffs, carRoot.position, carRoot.rotation.y, t);
+
+      camera.position.copy(driftFrame.cameraPosition);
+      camera.lookAt(driftFrame.cameraTarget);
+      carRoot.rotation.y = driftFrame.carYaw;
+
+      if (
+        driftFrame.driftProgress < 0.98 &&
+        driftFrame.transitionProgress < 0.1 &&
+        t - lastSmokeSpawn > 0.085
+      ) {
+        spawnDriftSmoke(smokePuffs, carRoot.position, driftFrame.smokeHeading, t);
         lastSmokeSpawn = t;
       }
-      updateDriftSmoke(smokePuffs, t, transitionProgress, camera);
+      updateDriftSmoke(smokePuffs, t, driftFrame.transitionProgress, camera);
 
-      const dynamicOverhead = overheadCamera.clone().add(new THREE.Vector3(x * 0.05, 0, z * 0.05));
-      camera.position.copy(dynamicOverhead.lerp(finalCamera, transitionProgress));
-      cameraTarget.copy(new THREE.Vector3(x, 0.22, z).lerp(finalTarget, transitionProgress));
-      camera.lookAt(cameraTarget);
-
-      if (!completionAnnounced && t >= FINAL_REVEAL_TIME) {
+      if (!completionAnnounced && handoffElapsed >= FINAL_REVEAL_TIME) {
         completionAnnounced = true;
         setIsComplete(true);
         setStatus("Thanks for booking. Your BMW is staged and ready.");
@@ -388,138 +382,9 @@ function createTireMarks(scene: THREE.Scene) {
       new THREE.MeshBasicMaterial({ color: "#090908", transparent: true, opacity }),
     );
     mark.rotation.x = Math.PI / 2;
-    mark.position.y = 0.026;
+    mark.position.set(DRIFT_CENTER.x, 0.026, DRIFT_CENTER.z);
     scene.add(mark);
     return mark;
-  });
-}
-
-function createDriftSmoke(scene: THREE.Scene): SmokePuff[] {
-  const texture = createSmokeTexture();
-
-  return Array.from({ length: SMOKE_PUFF_COUNT }, (_, index) => {
-    const material = new THREE.SpriteMaterial({
-      color: "#d1cec4",
-      depthTest: true,
-      depthWrite: false,
-      map: texture,
-      opacity: 0,
-      transparent: true,
-    });
-    const sprite = new THREE.Sprite(material);
-    sprite.visible = false;
-    sprite.renderOrder = 2;
-    scene.add(sprite);
-
-    return {
-      sprite,
-      bornAt: -999,
-      life: 1.8,
-      velocity: new THREE.Vector3(),
-      size: 1,
-    };
-  });
-}
-
-function createSmokeTexture() {
-  const size = 128;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    return null;
-  }
-
-  const gradient = context.createRadialGradient(58, 58, 8, 64, 64, 58);
-  gradient.addColorStop(0, "rgba(255,255,255,0.55)");
-  gradient.addColorStop(0.32, "rgba(235,232,222,0.34)");
-  gradient.addColorStop(0.68, "rgba(186,181,168,0.16)");
-  gradient.addColorStop(1, "rgba(150,145,135,0)");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, size, size);
-
-  context.globalCompositeOperation = "screen";
-  for (let i = 0; i < 7; i += 1) {
-    const x = 36 + ((i * 19) % 58);
-    const y = 34 + ((i * 31) % 62);
-    const radius = 16 + (i % 4) * 5;
-    const puff = context.createRadialGradient(x, y, 2, x, y, radius);
-    puff.addColorStop(0, "rgba(255,255,255,0.18)");
-    puff.addColorStop(1, "rgba(255,255,255,0)");
-    context.fillStyle = puff;
-    context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fill();
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function spawnDriftSmoke(
-  smokePuffs: SmokePuff[],
-  position: THREE.Vector3,
-  heading: number,
-  time: number,
-) {
-  const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
-  const rear = position.clone().addScaledVector(forward, -1.45);
-  const lateral = new THREE.Vector3(forward.z, 0, -forward.x);
-
-  [-1, 1].forEach((side) => {
-    const puff = smokePuffs.reduce((oldest, current) =>
-      current.bornAt < oldest.bornAt ? current : oldest,
-    );
-    const jitter = Math.sin((time + side) * 18.7) * 0.22;
-    const sideOffset = side * (0.48 + Math.abs(jitter) * 0.24);
-
-    puff.bornAt = time;
-    puff.life = 1.55 + Math.abs(Math.sin(time * 2.1 + side)) * 0.55;
-    puff.size = 0.58 + Math.abs(Math.cos(time * 3.3 + side)) * 0.26;
-    puff.velocity
-      .copy(forward)
-      .multiplyScalar(-0.28)
-      .addScaledVector(lateral, side * 0.18 + jitter * 0.08);
-    puff.sprite.position.copy(rear).addScaledVector(lateral, sideOffset);
-    puff.sprite.position.y = 0.22 + Math.abs(jitter) * 0.08;
-    puff.sprite.scale.setScalar(puff.size);
-    puff.sprite.visible = true;
-  });
-}
-
-function updateDriftSmoke(
-  smokePuffs: SmokePuff[],
-  time: number,
-  transitionProgress: number,
-  camera: THREE.PerspectiveCamera,
-) {
-  const fadeOut = 1 - transitionProgress;
-
-  smokePuffs.forEach((puff) => {
-    const age = time - puff.bornAt;
-
-    if (age < 0 || age > puff.life || fadeOut <= 0) {
-      puff.sprite.visible = false;
-      puff.sprite.material.opacity = 0;
-      return;
-    }
-
-    const normalizedAge = age / puff.life;
-    const lift = 0.16 * normalizedAge;
-    const expansion = 1 + normalizedAge * 2.2;
-
-    puff.sprite.visible = true;
-    puff.sprite.position.addScaledVector(puff.velocity, 0.016);
-    puff.sprite.position.y += lift * 0.016;
-    puff.sprite.scale.setScalar(puff.size * expansion);
-    puff.sprite.material.rotation += 0.0025;
-    puff.sprite.material.opacity =
-      Math.sin(normalizedAge * Math.PI) * 0.34 * (1 - normalizedAge * 0.22) * fadeOut;
-    puff.sprite.lookAt(camera.position);
   });
 }
 
@@ -706,15 +571,6 @@ function applyDriveAwayLightState(root: THREE.Object3D, on: boolean) {
       mat.needsUpdate = true;
     });
   });
-}
-
-function smoothstep(value: number) {
-  return value * value * (3 - 2 * value);
-}
-
-function lerpAngle(start: number, end: number, alpha: number) {
-  const delta = Math.atan2(Math.sin(end - start), Math.cos(end - start));
-  return start + delta * alpha;
 }
 
 function getMaterials(mesh: THREE.Mesh) {
