@@ -54,11 +54,7 @@ const MOBILE_CANVAS_BREAKPOINT = 768;
 const MOBILE_CANVAS_MIN_HEIGHT = 220;
 const MOBILE_MODEL_YAW = 0.45;
 
-function HeroStatIcon({
-  icon,
-}: {
-  icon: (typeof HERO_STATS)[number]["icon"];
-}) {
+function HeroStatIcon({ icon }: { icon: (typeof HERO_STATS)[number]["icon"] }) {
   if (icon === "speed") {
     return (
       <svg
@@ -302,7 +298,8 @@ export default function HomeModelViewer() {
               id={index === 0 ? "homepage_intro" : undefined}
               className={`relative z-10 flex min-h-0 flex-col overflow-hidden bg-[#060d1b] transition-all duration-700 ${
                 index === 0 && isExiting
-                  ? "pointer-events-none translate-x-full opacity-0 animate-slideOutRight"
+                  ? // ? "pointer-events-none translate-x-full opacity-0 animate-slideOutRight"
+                    "pointer-events-none"
                   : ""
               }`}
             >
