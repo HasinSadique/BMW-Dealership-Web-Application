@@ -11,12 +11,20 @@ export type ExitSpin = {
   toY: number;
 };
 
+export type HomeModelSize = {
+  width: number;
+  height: number;
+  depth: number;
+};
+
 export type HomeModelViewerRefs = {
   modelRootRef: MutableRefObject<THREE.Object3D | null>;
   controlsRef: MutableRefObject<OrbitControls | null>;
   exitSpinRef: MutableRefObject<ExitSpin | null>;
   /** 0 = full rotating hero, 1 = front close-up, 2 = interior through glass */
   activeHeroRef: MutableRefObject<number>;
+  onLoadingChange?: (isLoading: boolean) => void;
+  onModelSizeChange?: (size: HomeModelSize) => void;
 };
 
 export function attachHomeModelViewer(
@@ -26,10 +34,13 @@ export function attachHomeModelViewer(
     controlsRef,
     exitSpinRef,
     activeHeroRef,
+    onLoadingChange,
+    onModelSizeChange,
   }: HomeModelViewerRefs,
 ): () => void {
   let frameId: number;
   let renderer: THREE.WebGLRenderer | null = null;
+  let isDisposed = false;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#060d1b");
@@ -52,6 +63,9 @@ export function attachHomeModelViewer(
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   mountNode.appendChild(renderer.domElement);
+  renderer.domElement.style.display = "block";
+  renderer.domElement.style.width = "100%";
+  renderer.domElement.style.height = "100%";
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controlsRef.current = controls;
@@ -296,9 +310,12 @@ export function attachHomeModelViewer(
   }
 
   const loader = new GLTFLoader();
+  onLoadingChange?.(true);
   loader.load(
     "/models/bmw_m4_f82.glb",
     (gltf) => {
+      if (isDisposed) return;
+
       gltf.scene.rotation.y = -0.45;
       gltf.scene.scale.setScalar(1.85);
 
@@ -322,19 +339,29 @@ export function attachHomeModelViewer(
       modelRootRef.current = gltf.scene;
 
       const finalBox = new THREE.Box3().setFromObject(group);
+      const finalSize = finalBox.getSize(new THREE.Vector3());
       const groundCenter = finalBox.getCenter(new THREE.Vector3());
       shadowCatcher.position.set(
         groundCenter.x,
         finalBox.min.y - 0.02,
         groundCenter.z,
       );
+      onModelSizeChange?.({
+        width: finalSize.x,
+        height: finalSize.y,
+        depth: finalSize.z,
+      });
 
       fitModelToViewport();
       modelReady = true;
       settledHero = 0;
+      onLoadingChange?.(false);
     },
     undefined,
     (loadError) => {
+      if (isDisposed) return;
+
+      onLoadingChange?.(false);
       console.error("Could not load 3D model.", loadError);
     },
   );
@@ -342,6 +369,8 @@ export function attachHomeModelViewer(
   function onResize() {
     const w = mountNode.clientWidth;
     const h = mountNode.clientHeight;
+    if (w === 0 || h === 0) return;
+
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer!.setSize(w, h, false);
@@ -357,8 +386,16 @@ export function attachHomeModelViewer(
     stopAutoRotateOnInteraction();
   }
 
+  let resizeObserver: ResizeObserver | null = null;
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
-  window.addEventListener("resize", onResize);
+
+  if (typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(mountNode);
+  } else {
+    window.addEventListener("resize", onResize);
+  }
+
   onResize();
   function animate() {
     const spin = exitSpinRef.current;
@@ -437,8 +474,13 @@ export function attachHomeModelViewer(
   animate();
 
   return () => {
+    isDisposed = true;
     cancelAnimationFrame(frameId);
-    window.removeEventListener("resize", onResize);
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+    } else {
+      window.removeEventListener("resize", onResize);
+    }
     renderer?.domElement.removeEventListener("pointerdown", onPointerDown);
     controlsRef.current = null;
     modelRootRef.current = null;

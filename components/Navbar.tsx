@@ -27,9 +27,9 @@ export default function Navbar() {
             alt="BMW logo"
             width={50}
             height={50}
-            unoptimized
-            priority
-            className="rounded-full object-contain shadow-[0_0_0_1px_rgba(189,215,255,0.45),0_0_18px_rgba(95,159,255,0.35)]"
+            // unoptimized
+            // priority
+            // className="rounded-full object-contain shadow-[0_0_0_1px_rgba(189,215,255,0.45),0_0_18px_rgba(95,159,255,0.35)]"
           />
           <div className="flex flex-col gap-0.5">
             <span className="text-lg font-extrabold tracking-[0.1em] text-white [text-shadow:0_2px_10px_rgba(79,141,230,0.35)]">
