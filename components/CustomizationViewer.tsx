@@ -33,20 +33,20 @@ const pathMap: Record<string, string> = {
 const SCENE_BACKGROUND = 0x050915;
 
 /**
- * 车模型整体大小。
- * 数值越大，模型越大。
+ * Overall car model size.
+ * Higher values make the model larger.
  */
 const MODEL_TARGET_SIZE = 5;
 
 /**
- * 相机距离系数。
- * 数值越小，车越大。
+ * Camera distance multiplier.
+ * Lower values make the car appear larger.
  */
 const CAMERA_PADDING = 0.9;
 
 /**
- * 车在画面里的填充比例。
- * 数值越大，车越撑满画布。
+ * Car fill ratio within the viewport.
+ * Higher values make the car fill more of the canvas.
  */
 const CAMERA_FILL_RATIO = 0.78;
 const KEYBOARD_TRANSLATE_STEP = 0.22;
@@ -55,17 +55,17 @@ const FLOOR_TOP_Y = -0.42;
 const MODEL_FLOOR_GAP = 0.02;
 
 /**
- * 如果白色前灯出现在车尾，把这里改成 -1。
+ * Change this to -1 if white headlights appear at the rear.
  */
 const FRONT_SIGN: 1 | -1 = 1;
 
 /**
- * 模型里真实的灯光材质名。
+ * Real light material names in the model.
  */
 const REAL_LIGHT_MATERIAL_NAME = "m4car_emissive1";
 
 /**
- * 车灯内嵌发光强度。
+ * Embedded light emission intensity.
  */
 const FRONT_LIGHT_POWER = 3.4;
 const REAR_LIGHT_POWER = 2.7;
@@ -74,7 +74,7 @@ const FRONT_LIGHT_OPACITY = 0.82;
 const REAR_LIGHT_OPACITY = 0.78;
 
 /**
- * 从真实灯光 mesh 中切前灯/尾灯三角面的判定范围。
+ * Classification range for splitting headlight and taillight triangles from the real light mesh.
  */
 const EDGE_RATIO = 0.2;
 const SIDE_RATIO = 0.36;
@@ -386,6 +386,7 @@ export default function CustomizationViewer({
         cancelAnimationFrame(rafId);
       }
 
+      cancelCameraMove(camera);
       controls.dispose();
 
       if (host.contains(renderer.domElement)) {
@@ -458,9 +459,9 @@ export default function CustomizationViewer({
         const scale = maxAxis > 0 ? MODEL_TARGET_SIZE / maxAxis : 1;
 
         /**
-         * 1. 把 GLB 模型自身中心移到原点
-         * 2. 整体缩放
-         * 3. 把模型底部放到展示台上
+         * 1. Move the GLB model center to the origin.
+         * 2. Scale the model uniformly.
+         * 3. Place the model bottom on the display platform.
          */
         const centeredGroup = new THREE.Group();
         centeredGroup.add(modelScene);
@@ -498,7 +499,8 @@ export default function CustomizationViewer({
         applyWindowState(group, windowsDownRef.current);
 
         /**
-         * 把车灯发光效果嵌入真实 m4car_emissive1 车灯 mesh，并用可控光源补强。
+         * Embed the light glow into the real m4car_emissive1 light mesh
+         * and reinforce it with controllable light sources.
          */
         applyEmbeddedCarLights(modelScene, originalBox);
         setEmbeddedLightVisibility(group, lightsOnRef.current);
@@ -1246,7 +1248,7 @@ function applyColorsToScene(
       const name = `${meshName} ${materialName}`;
 
       /**
-       * 不改真实灯光材质颜色。
+       * Keep the real light material colors unchanged.
        */
       if (
         name.includes(REAL_LIGHT_MATERIAL_NAME) ||
@@ -1402,8 +1404,31 @@ function moveCameraTo(
   target: THREE.Vector3,
   minDistance = 0.8,
   maxDistance?: number,
+  options: { animated?: boolean; duration?: number } = {},
 ) {
   if (!camera) return;
+
+  cancelCameraMove(camera);
+
+  const currentDistance = position.distanceTo(target);
+  const nextMaxDistance = Math.max(
+    maxDistance ?? currentDistance * 3,
+    currentDistance * 3,
+    6,
+  );
+
+  if (options.animated && controls) {
+    animateCameraTo(
+      camera,
+      controls,
+      position,
+      target,
+      minDistance,
+      nextMaxDistance,
+      options.duration ?? 720,
+    );
+    return;
+  }
 
   camera.position.copy(position);
   camera.lookAt(target);
@@ -1413,15 +1438,66 @@ function moveCameraTo(
 
   if (controls) {
     controls.target.copy(target);
-    const currentDistance = position.distanceTo(target);
     controls.minDistance = minDistance;
-    controls.maxDistance = Math.max(
-      maxDistance ?? currentDistance * 3,
-      currentDistance * 3,
-      6,
-    );
+    controls.maxDistance = nextMaxDistance;
     controls.update();
   }
+}
+
+function animateCameraTo(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls,
+  endPosition: THREE.Vector3,
+  endTarget: THREE.Vector3,
+  minDistance: number,
+  maxDistance: number,
+  duration: number,
+) {
+  const startPosition = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const startTime = performance.now();
+
+  controls.minDistance = minDistance;
+  controls.maxDistance = maxDistance;
+  camera.near = 0.01;
+  camera.far = Math.max(endPosition.distanceTo(endTarget) * 12, 100);
+  camera.updateProjectionMatrix();
+
+  const step = (now: number) => {
+    const progress = THREE.MathUtils.clamp((now - startTime) / duration, 0, 1);
+    const eased = smoothstep(progress);
+
+    camera.position.copy(startPosition).lerp(endPosition, eased);
+    controls.target.copy(startTarget).lerp(endTarget, eased);
+    camera.lookAt(controls.target);
+    controls.update();
+
+    if (progress < 1) {
+      camera.userData.__customCameraMoveId = requestAnimationFrame(step);
+      return;
+    }
+
+    camera.position.copy(endPosition);
+    controls.target.copy(endTarget);
+    camera.lookAt(endTarget);
+    controls.update();
+    delete camera.userData.__customCameraMoveId;
+  };
+
+  camera.userData.__customCameraMoveId = requestAnimationFrame(step);
+}
+
+function cancelCameraMove(camera: THREE.PerspectiveCamera) {
+  const animationId = camera.userData.__customCameraMoveId;
+
+  if (typeof animationId === "number") {
+    cancelAnimationFrame(animationId);
+    delete camera.userData.__customCameraMoveId;
+  }
+}
+
+function smoothstep(value: number) {
+  return value * value * (3 - 2 * value);
 }
 
 function focusCameraOnWheels(
@@ -1493,6 +1569,7 @@ function focusCameraOnWheels(
     target,
     Math.max(radius * 0.35, 0.18),
     wholeCarZoomDistance,
+    { animated: true, duration: 760 },
   );
 }
 
