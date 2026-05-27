@@ -41,7 +41,7 @@ export default function CustomizationApp({ model }: Props) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-none px-4 py-4 lg:px-8">
       <div className="grid min-h-0 w-full grid-cols-1 items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        {/* 左边全屏车辆视窗 */}
+        {/* Full-screen vehicle viewport on the left */}
         <div className="relative h-[calc(100vh-128px)] min-w-0 overflow-hidden rounded-2xl border border-white/15">
           <div className="pointer-events-none absolute left-5 top-5 z-10 max-w-xl rounded-xl border border-white/10 bg-black/35 px-4 py-3 shadow-lg backdrop-blur">
             <p className="m-0 text-xs uppercase tracking-[0.22em] text-[#4f8de6]">
@@ -66,7 +66,7 @@ export default function CustomizationApp({ model }: Props) {
           />
         </div>
 
-        {/* 右边控制栏 */}
+        {/* Control panel on the right */}
         <div className="min-h-0 min-w-0 lg:sticky lg:top-[88px] lg:h-[calc(100vh-120px)] lg:overflow-y-auto">
           <CustomizationPanel
             model={model}
