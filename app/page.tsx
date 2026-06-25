@@ -509,7 +509,7 @@ export default function HomeModelViewer() {
     }
     navigateTimeoutRef.current = window.setTimeout(() => {
       navigateTimeoutRef.current = null;
-      router.push("/customising/bmw-i4");
+      router.push("/customising/bmw-m4-competition");
     }, 2200);
   };
 
@@ -590,7 +590,7 @@ export default function HomeModelViewer() {
         } as React.CSSProperties);
 
   return (
-    <div className="relative h-[calc(100dvh-72px)] w-full overflow-hidden bg-[radial-gradient(circle_at_18%_22%,#102a4f_0%,#081629_38%,#050d18_72%,#040a14_100%)] text-slate-100">
+    <div className=" relative h-[calc(100dvh-72px)] w-full overflow-hidden bg-[radial-gradient(circle_at_18%_22%,#102a4f_0%,#081629_38%,#050d18_72%,#040a14_100%)] text-slate-100">
       <div
         style={mobileCanvasHeightStyle}
         className="pointer-events-auto fixed left-0 top-[72px] z-30 h-[40dvh] w-full md:h-[calc(100dvh-72px)] md:w-[65%]"

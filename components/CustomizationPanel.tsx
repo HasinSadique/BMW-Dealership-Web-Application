@@ -3,27 +3,16 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import type { CarModel } from "@/data/models";
-import type { WheelStyle } from "./CustomizationApp";
 
 type CustomizationPanelProps = {
-  model: CarModel;
-  doorsOpen: boolean;
-  windowsDown: boolean;
-  lightsOn: boolean;
-  roofLightOn: boolean;
   driveAwayHref: string;
+  driveVerseHref: string;
+  showDriveVerse?: boolean;
   onExteriorChange?: (hex: string) => void;
   onInteriorChange?: (hex: string) => void;
-  onWheelColorChange?: (hex: string) => void;
-  onWheelStyleChange?: (style: WheelStyle) => void;
-  onDoorsOpenChange?: (open: boolean) => void;
-  onWindowsDownChange?: (down: boolean) => void;
-  onLightsOnChange?: (on: boolean) => void;
-  onRoofLightChange?: (on: boolean) => void;
 };
 
-type SectionKey = "paint" | "wheels" | "interior" | "features";
+type SectionKey = "paint" | "interior";
 
 const colorOptions: Record<string, string> = {
   "Alpine White": "#F8F8F4",
@@ -42,38 +31,17 @@ const interiors: Record<string, string> = {
   "Fiona Red": "#8f1720",
 };
 
-const wheelColors: Record<string, string> = {
-  "Brushed Silver": "#cfd6df",
-  "Orbit Grey": "#4f5864",
-  "Jet Black": "#07090d",
-  "Champagne Gold": "#c6a15b",
-};
-
-const wheelStyles: Array<{ label: string; value: WheelStyle }> = [
-  { label: "Classic Multi-spoke", value: "classic" },
-  { label: "M Sport Split-spoke", value: "sport" },
-  { label: "Aero Disc", value: "aero" },
-];
-
 export default function CustomizationPanel({
-  model,
-  doorsOpen,
-  windowsDown,
-  lightsOn,
-  roofLightOn,
   driveAwayHref,
+  driveVerseHref,
+  showDriveVerse = true,
   onExteriorChange,
   onInteriorChange,
-  onWheelColorChange,
-  onWheelStyleChange,
-  onDoorsOpenChange,
-  onWindowsDownChange,
-  onLightsOnChange,
-  onRoofLightChange,
 }: CustomizationPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<SectionKey | null>(null);
-  const hasRealDoorNodes = !["bmw-z8", "bmw-m3-cs-touring", "bmw-m3-topaz", "bmw-x5"].includes(model.id);
+  const [expandedSection, setExpandedSection] = useState<SectionKey | null>(
+    null,
+  );
   const toggleSection = (section: SectionKey) => {
     setExpandedSection((current) => (current === section ? null : section));
   };
@@ -113,41 +81,13 @@ export default function CustomizationPanel({
                 onClick={() => onExteriorChange?.(colorOptions[label])}
                 className="mb-2 flex w-full items-center gap-3 rounded-md border border-white/15 bg-[rgba(9,18,31,0.65)] px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-white/10"
               >
-                <span className="inline-block h-5 w-10 rounded" style={{ background: colorOptions[label] }} />
+                <span
+                  className="inline-block h-5 w-10 rounded"
+                  style={{ background: colorOptions[label] }}
+                />
                 <span>{label}</span>
               </button>
             ))}
-          </AccordionSection>
-
-          <AccordionSection
-            title="Wheels"
-            isExpanded={expandedSection === "wheels"}
-            onToggle={() => toggleSection("wheels")}
-          >
-            <p className="mb-2 text-xs text-slate-400">
-              Change wheel finish or style. The camera zooms to the car’s actual wheel after selection.
-            </p>
-            {Object.keys(wheelColors).map((label) => (
-              <button
-                key={label}
-                onClick={() => onWheelColorChange?.(wheelColors[label])}
-                className="mb-2 flex w-full items-center gap-3 rounded-md border border-white/15 bg-[rgba(9,18,31,0.65)] px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-white/10"
-              >
-                <span className="inline-block h-5 w-10 rounded" style={{ background: wheelColors[label] }} />
-                <span>{label}</span>
-              </button>
-            ))}
-            <div className="grid grid-cols-1 gap-2 pt-1">
-              {wheelStyles.map((style) => (
-                <button
-                  key={style.value}
-                  onClick={() => onWheelStyleChange?.(style.value)}
-                  className="rounded-md border border-[#4f8de6]/40 bg-[#0b2344]/70 px-3 py-2 text-left text-xs font-medium text-slate-100 transition hover:bg-[#163a6d]"
-                >
-                  {style.label}
-                </button>
-              ))}
-            </div>
           </AccordionSection>
 
           <AccordionSection
@@ -164,37 +104,13 @@ export default function CustomizationPanel({
                 onClick={() => onInteriorChange?.(interiors[label])}
                 className="mb-2 flex w-full items-center gap-3 rounded-md border border-white/15 bg-[rgba(9,18,31,0.65)] px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-white/10"
               >
-                <span className="inline-block h-5 w-10 rounded" style={{ background: interiors[label] }} />
+                <span
+                  className="inline-block h-5 w-10 rounded"
+                  style={{ background: interiors[label] }}
+                />
                 <span>{label}</span>
               </button>
             ))}
-          </AccordionSection>
-
-          <AccordionSection
-            title="Interactive Features"
-            isExpanded={expandedSection === "features"}
-            onToggle={() => toggleSection("features")}
-          >
-            <div className="space-y-2">
-              <ToggleButton
-                active={doorsOpen}
-                disabled={!hasRealDoorNodes}
-                onClick={() => onDoorsOpenChange?.(!doorsOpen)}
-              >
-                {hasRealDoorNodes
-                  ? doorsOpen ? "Close doors" : "Open doors"
-                  : "Real doors unavailable for this model"}
-              </ToggleButton>
-              <ToggleButton active={windowsDown} onClick={() => onWindowsDownChange?.(!windowsDown)}>
-                {windowsDown ? "Roll windows up" : "Roll windows down"}
-              </ToggleButton>
-              <ToggleButton active={lightsOn} onClick={() => onLightsOnChange?.(!lightsOn)}>
-                {lightsOn ? "Turn lights off" : "Turn lights on"}
-              </ToggleButton>
-              <ToggleButton active={roofLightOn} onClick={() => onRoofLightChange?.(!roofLightOn)}>
-                {roofLightOn ? "Turn roof light off" : "Turn roof light on"}
-              </ToggleButton>
-            </div>
           </AccordionSection>
 
           <section className="mt-6 border-t border-white/10 pt-4">
@@ -206,6 +122,24 @@ export default function CustomizationPanel({
             </Link>
           </section>
 
+          {showDriveVerse ? (
+            <section className="mt-6 border-t border-white/10 pt-4">
+              <Link
+                href={driveVerseHref}
+                className="block w-full rounded-xl bg-gradient-to-r from-[#2f7de1] to-[#65b7ff] px-4 py-3 text-center text-sm font-bold tracking-[0.18em] text-white shadow-[0_16px_40px_rgba(47,125,225,0.35)] transition hover:translate-y-[-1px] hover:shadow-[0_20px_48px_rgba(101,183,255,0.42)]"
+                style={{
+                  textTransform: "none",
+                  letterSpacing: "0.1em",
+                  fontSize: "1.1rem",
+                  fontFamily: "var(--font-sans, inherit)",
+                  userSelect: "none",
+                }}
+              >
+                <span style={{ fontWeight: 700, color: "#4bf1fa" }}>Drive</span>
+                <span style={{ fontWeight: 800, color: "#eaea50" }}>Verse</span>
+              </Link>
+            </section>
+          ) : null}
         </aside>
         <button
           type="button"
@@ -215,34 +149,6 @@ export default function CustomizationPanel({
         />
       </div>
     </>
-  );
-}
-
-function ToggleButton({
-  active,
-  children,
-  disabled = false,
-  onClick,
-}: {
-  active: boolean;
-  children: ReactNode;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full rounded-md border px-3 py-2 text-left text-sm font-medium transition ${
-        disabled
-          ? "cursor-not-allowed border-white/10 bg-[rgba(9,18,31,0.35)] text-slate-500"
-          : active
-            ? "border-[#6eb7ff] bg-[#1e4a86] text-white shadow-[0_0_18px_rgba(110,183,255,0.22)]"
-            : "border-white/15 bg-[rgba(9,18,31,0.65)] text-slate-100 hover:bg-white/10"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -275,11 +181,15 @@ function AccordionSection({
       </button>
       <div
         className={`grid transition-[grid-template-rows,opacity] duration-200 ${
-          isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          isExpanded
+            ? "grid-rows-[1fr] opacity-100"
+            : "grid-rows-[0fr] opacity-0"
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="border-t border-white/10 px-3 pb-3 pt-3">{children}</div>
+          <div className="border-t border-white/10 px-3 pb-3 pt-3">
+            {children}
+          </div>
         </div>
       </div>
     </section>

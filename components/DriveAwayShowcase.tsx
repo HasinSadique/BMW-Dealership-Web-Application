@@ -31,7 +31,6 @@ type DriveAwayShowcaseProps = {
 const pathMap: Record<string, string> = {
   "bmw-m3-cs-touring": "/models/2025_bmw_m3_cs_touring.glb",
   "bmw-m4-competition": "/models/2025_bmw_m4_competition.glb",
-  "bmw-m4-f82": "/models/bmw_m4_f82.glb",
   "bmw-m3-topaz": "/models/bmw_m3_sedan_topaz_blue_car.glb",
   "bmw-x3": "/models/bmw_x3_m40i.glb",
   "bmw-z8": "/models/bmw_z8__www.vecarz.com.glb",
@@ -57,7 +56,9 @@ export default function DriveAwayShowcase({
   const [isComplete, setIsComplete] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const handoffStatus = resolvedPath ? status : "No 3D model is available for this handoff.";
+  const handoffStatus = resolvedPath
+    ? status
+    : "No 3D model is available for this handoff.";
 
   const startAudio = useCallback(async () => {
     if (!audioRef.current) {
@@ -214,11 +215,14 @@ export default function DriveAwayShowcase({
               );
             }
           });
-          setStatus("Your customized BMW is ready to drift into the handoff bay.");
+          setStatus(
+            "Your customized BMW is ready to drift into the handoff bay.",
+          );
         },
         undefined,
         () => {
-          if (!disposed) setStatus("Unable to load this BMW handoff animation.");
+          if (!disposed)
+            setStatus("Unable to load this BMW handoff animation.");
         },
       );
     }
@@ -232,7 +236,8 @@ export default function DriveAwayShowcase({
         handoffStartTime = t;
       }
 
-      const handoffElapsed = handoffStartTime === null ? 0 : t - handoffStartTime;
+      const handoffElapsed =
+        handoffStartTime === null ? 0 : t - handoffStartTime;
       const driftFrame = calculateDriftFrame(handoffElapsed, t, camera);
 
       carRoot.position.copy(driftFrame.position);
@@ -259,7 +264,12 @@ export default function DriveAwayShowcase({
         driftFrame.transitionProgress < 0.1 &&
         t - lastSmokeSpawn > 0.085
       ) {
-        spawnDriftSmoke(smokePuffs, carRoot.position, driftFrame.smokeHeading, t);
+        spawnDriftSmoke(
+          smokePuffs,
+          carRoot.position,
+          driftFrame.smokeHeading,
+          t,
+        );
         lastSmokeSpawn = t;
       }
       updateDriftSmoke(smokePuffs, t, driftFrame.transitionProgress, camera);
@@ -289,7 +299,8 @@ export default function DriveAwayShowcase({
       disposed = true;
       cancelAnimationFrame(animationId);
       window.removeEventListener("resize", resize);
-      if (host.contains(renderer.domElement)) host.removeChild(renderer.domElement);
+      if (host.contains(renderer.domElement))
+        host.removeChild(renderer.domElement);
       disposeObject3D(scene);
       renderer.dispose();
     };
@@ -307,9 +318,14 @@ export default function DriveAwayShowcase({
 
   return (
     <div className="relative min-h-[calc(100vh-96px)] overflow-hidden rounded-2xl border border-white/10 bg-[#050608]">
-      <div ref={hostRef} className="h-[calc(100vh-96px)] min-h-[680px] w-full" />
+      <div
+        ref={hostRef}
+        className="h-[calc(100vh-96px)] min-h-[680px] w-full"
+      />
       <div className="pointer-events-none absolute left-6 top-6 max-w-xl rounded-2xl border border-white/10 bg-black/55 p-5 shadow-2xl backdrop-blur">
-        <p className="m-0 text-xs uppercase tracking-[0.28em] text-[#68a7ff]">Drive Away</p>
+        <p className="m-0 text-xs uppercase tracking-[0.28em] text-[#68a7ff]">
+          Drive Away
+        </p>
         <h1 className="mt-2 text-4xl font-bold text-white">{model.name}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-300">{handoffStatus}</p>
       </div>
@@ -318,16 +334,22 @@ export default function DriveAwayShowcase({
           isComplete ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"
         }`}
       >
-        <p className="text-xs uppercase tracking-[0.36em] text-[#8cc8ff]">BMW Dealership</p>
+        <p className="text-xs uppercase tracking-[0.36em] text-[#8cc8ff]">
+          BMW DriveVerse
+        </p>
         <h2 className="mt-3 text-3xl font-black uppercase tracking-[0.14em] text-white sm:text-4xl">
           Thanks for booking
         </h2>
-        <p className="mt-3 text-sm text-slate-300">Your configured BMW is ready for the next step.</p>
+        <p className="mt-3 text-sm text-slate-300">
+          Your configured BMW is ready for the next step.
+        </p>
       </div>
       <button
         type="button"
         aria-pressed={isAudioPlaying}
-        aria-label={isAudioPlaying ? "Pause drive away music" : "Play drive away music"}
+        aria-label={
+          isAudioPlaying ? "Pause drive away music" : "Play drive away music"
+        }
         onClick={toggleAudio}
         className="absolute bottom-6 left-6 z-10 rounded-full border border-[#68a7ff]/40 bg-black/55 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#d9ecff] shadow-xl backdrop-blur transition hover:border-[#9bd0ff]/70 hover:bg-[#0b2344]/80"
       >
@@ -347,8 +369,14 @@ function addGarageDetails(scene: THREE.Scene) {
   ceiling.receiveShadow = true;
   scene.add(ceiling);
 
-  const pipeMaterial = new THREE.MeshStandardMaterial({ color: "#6b3a2c", roughness: 0.58 });
-  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 15, 16), pipeMaterial);
+  const pipeMaterial = new THREE.MeshStandardMaterial({
+    color: "#6b3a2c",
+    roughness: 0.58,
+  });
+  const pipe = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.055, 0.055, 15, 16),
+    pipeMaterial,
+  );
   pipe.rotation.z = Math.PI / 2;
   pipe.position.set(0, 5.15, -6.9);
   scene.add(pipe);
@@ -362,9 +390,16 @@ function addGarageDetails(scene: THREE.Scene) {
 }
 
 function addParkingLines(scene: THREE.Scene) {
-  const lineMaterial = new THREE.MeshBasicMaterial({ color: "#d0a44a", transparent: true, opacity: 0.42 });
+  const lineMaterial = new THREE.MeshBasicMaterial({
+    color: "#d0a44a",
+    transparent: true,
+    opacity: 0.42,
+  });
   [-7.2, 7.2].forEach((x) => {
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 18), lineMaterial);
+    const line = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.08, 18),
+      lineMaterial,
+    );
     line.rotation.x = -Math.PI / 2;
     line.position.set(x, 0.012, 0);
     scene.add(line);
@@ -379,7 +414,11 @@ function createTireMarks(scene: THREE.Scene) {
   ].map(({ radius, thickness, opacity }) => {
     const mark = new THREE.Mesh(
       new THREE.TorusGeometry(radius, thickness, 10, 220),
-      new THREE.MeshBasicMaterial({ color: "#090908", transparent: true, opacity }),
+      new THREE.MeshBasicMaterial({
+        color: "#090908",
+        transparent: true,
+        opacity,
+      }),
     );
     mark.rotation.x = Math.PI / 2;
     mark.position.set(DRIFT_CENTER.x, 0.026, DRIFT_CENTER.z);
@@ -441,7 +480,11 @@ function applyDriveAwayColors(
       const materialName = (mat.name || "").toLowerCase();
       const name = `${meshName} ${materialName}`;
 
-      if (isRealLightMaterialName(name) || isGlassLike(name) || isWheelLike(name)) {
+      if (
+        isRealLightMaterialName(name) ||
+        isGlassLike(name) ||
+        isWheelLike(name)
+      ) {
         return;
       }
 
@@ -449,9 +492,7 @@ function applyDriveAwayColors(
         try {
           mat.color.set(interior);
           mat.needsUpdate = true;
-        } catch {
-          // Ignore malformed color values from manually edited URLs.
-        }
+        } catch {}
         return;
       }
 
@@ -459,9 +500,7 @@ function applyDriveAwayColors(
         try {
           mat.color.set(exterior);
           mat.needsUpdate = true;
-        } catch {
-          // Ignore malformed color values from manually edited URLs.
-        }
+        } catch {}
       }
     });
   });
@@ -518,7 +557,8 @@ function applyDriveAwayDoorState(root: THREE.Object3D, open: boolean) {
     const name = (obj.name || "").toLowerCase();
     if (!name.includes("door")) return;
 
-    obj.rotation.y += name.includes("left") || name.includes("driver") ? 0.68 : -0.68;
+    obj.rotation.y +=
+      name.includes("left") || name.includes("driver") ? 0.68 : -0.68;
   });
 }
 
@@ -556,7 +596,11 @@ function applyDriveAwayLightState(root: THREE.Object3D, on: boolean) {
     if (!(obj instanceof THREE.Mesh)) return;
 
     const name = getObjectSearchName(obj);
-    if (!isRealLightMaterialName(name) && !name.includes("headlight") && !name.includes("drl")) {
+    if (
+      !isRealLightMaterialName(name) &&
+      !name.includes("headlight") &&
+      !name.includes("drl")
+    ) {
       return;
     }
 
@@ -608,6 +652,15 @@ function normalizeHexColor(value: string | undefined, fallback: string) {
 }
 
 function isDecorativeWheelBlurName(name: string) {
+  // TNRRims TireBlur meshes are solid tire rubber on models like M4 Competition,
+  // not motion-blur decorations.
+  if (
+    name.includes("tnrrims") &&
+    (name.includes("tireblur") || name.includes("tyreblur"))
+  ) {
+    return false;
+  }
+
   return (
     name.includes("tireblur") ||
     name.includes("tyreblur") ||

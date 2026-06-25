@@ -35,7 +35,7 @@ export default function Navbar() {
             <span className="text-lg font-extrabold tracking-[0.1em] text-white [text-shadow:0_2px_10px_rgba(79,141,230,0.35)]">
               BMW
             </span>
-            <span className="text-xs text-white">Dealership</span>
+            <span className="text-xs text-white">DriveVerse</span>
           </div>
         </Link>
 

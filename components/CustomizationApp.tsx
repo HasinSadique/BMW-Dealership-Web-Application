@@ -20,23 +20,20 @@ export default function CustomizationApp({ model }: Props) {
   const [windowsDown, setWindowsDown] = useState(false);
   const [lightsOn, setLightsOn] = useState(false);
   const [roofLightOn, setRoofLightOn] = useState(true);
-  const [wheelFocusKey, setWheelFocusKey] = useState(0);
+  const customizationQuery = new URLSearchParams({
+    exterior,
+    interior,
+    wheel: wheelColor,
+    wheelStyle,
+    doorsOpen: String(doorsOpen),
+    windowsDown: String(windowsDown),
+    lightsOn: String(lightsOn),
+  }).toString();
 
-  const focusWheelAfterSelection = () => {
-    setWheelFocusKey((key) => key + 1);
-  };
-
-  const driveAwayHref =
-    `/drive-away/${model.id}?` +
-    new URLSearchParams({
-      exterior,
-      interior,
-      wheel: wheelColor,
-      wheelStyle,
-      doorsOpen: String(doorsOpen),
-      windowsDown: String(windowsDown),
-      lightsOn: String(lightsOn),
-    }).toString();
+  const driveAwayHref = `/drive-away/${model.id}?${customizationQuery}`;
+  const driveVerseSlug =
+    model.id === "bmw-m4-f82" ? "bmw-m4-competition" : model.id;
+  const driveVerseHref = `/driveverse/${driveVerseSlug}?${customizationQuery}`;
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-none px-4 py-4 lg:px-8">
@@ -62,33 +59,17 @@ export default function CustomizationApp({ model }: Props) {
             windowsDown={windowsDown}
             lightsOn={lightsOn}
             roofLightOn={roofLightOn}
-            wheelFocusKey={wheelFocusKey}
           />
         </div>
 
         {/* Control panel on the right */}
         <div className="min-h-0 min-w-0 lg:sticky lg:top-[88px] lg:h-[calc(100vh-120px)] lg:overflow-y-auto">
           <CustomizationPanel
-            model={model}
-            doorsOpen={doorsOpen}
-            windowsDown={windowsDown}
-            lightsOn={lightsOn}
-            roofLightOn={roofLightOn}
             driveAwayHref={driveAwayHref}
+            driveVerseHref={driveVerseHref}
+            showDriveVerse={model.id !== "bmw-m3-topaz"}
             onExteriorChange={(c: string) => setExterior(c)}
             onInteriorChange={(c: string) => setInterior(c)}
-            onWheelColorChange={(c: string) => {
-              setWheelColor(c);
-              focusWheelAfterSelection();
-            }}
-            onWheelStyleChange={(style) => {
-              setWheelStyle(style);
-              focusWheelAfterSelection();
-            }}
-            onDoorsOpenChange={setDoorsOpen}
-            onWindowsDownChange={setWindowsDown}
-            onLightsOnChange={setLightsOn}
-            onRoofLightChange={setRoofLightOn}
           />
         </div>
       </div>

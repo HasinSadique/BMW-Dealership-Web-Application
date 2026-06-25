@@ -78,7 +78,7 @@ export function attachHomeModelViewer(
   controls.maxPolarAngle = Math.PI * 0.8;
   controls.enableRotate = true;
   controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.9;
+  controls.autoRotateSpeed = 2; // Rotation
 
   let hasUserInteracted = false;
   const stopAutoRotateOnInteraction = () => {

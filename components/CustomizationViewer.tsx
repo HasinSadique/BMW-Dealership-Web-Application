@@ -1595,7 +1595,14 @@ function focusCameraOnInterior(
   position.y = metrics.box.min.y + metrics.size.y * 0.86;
 
   applyRoofPreviewLightState(group, roofLightOn);
-  moveCameraTo(camera, controls, position, target, 0.45, Math.max(length * 2.2, width * 4.2, 8));
+  moveCameraTo(
+    camera,
+    controls,
+    position,
+    target,
+    0.45,
+    Math.max(length * 2.2, width * 4.2, 8),
+  );
 }
 
 function applyRoofPreviewLightState(group: THREE.Group, enabled: boolean) {
@@ -1619,7 +1626,10 @@ function getInteriorPreviewTarget(group: THREE.Group) {
   return target;
 }
 
-function applyInteriorPreviewLight(group: THREE.Group, worldTarget: THREE.Vector3) {
+function applyInteriorPreviewLight(
+  group: THREE.Group,
+  worldTarget: THREE.Vector3,
+) {
   removeCustomChildren(group, "__custom_interior_preview_light");
 
   const metrics = getCarMetrics(group);
@@ -2142,8 +2152,6 @@ function findHeadlightAnchors(group: THREE.Group, metrics: CarMetrics) {
   return Array.from(sideBoxes.values())
     .map((box) => {
       const center = box.getCenter(new THREE.Vector3());
-      // Nudge the helper slightly outward from the body skin, but keep it on the
-      // actual light cluster rather than floating in front of the bumper.
       setAxisValue(
         center,
         metrics.lengthAxis,
@@ -2230,6 +2238,15 @@ function isWheelLikeName(name: string) {
 }
 
 function isDecorativeWheelBlurName(name: string) {
+  // TNRRims TireBlur meshes are solid tire rubber on models like M4 Competition,
+  // not motion-blur decorations.
+  if (
+    name.includes("tnrrims") &&
+    (name.includes("tireblur") || name.includes("tyreblur"))
+  ) {
+    return false;
+  }
+
   return (
     name.includes("tireblur") ||
     name.includes("tyreblur") ||
