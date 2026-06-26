@@ -48,7 +48,7 @@ const TRACK_TARGET_SPAN = 280;
 const MODEL_SIZE = 5;
 const MAX_SPEED = 30;
 const MAX_REVERSE = 10;
-const ACCELERATION = 10;
+const ACCELERATION = 8;
 const BRAKE_FORCE = 32;
 const COAST_DRAG = 2.2;
 const STEER_ANGLE = (42 * Math.PI) / 180;
@@ -64,7 +64,7 @@ const CAM_HEIGHT = 3.0;
 const CAM_LOOK_FORWARD = 5.5;
 const CAM_LOOK_HEIGHT = 1.1;
 const CAM_SPEED_PULLBACK = 3.2;
-const SPEED_TO_KMH = 216 / MAX_SPEED;
+const SPEED_TO_KMH = 270 / MAX_SPEED;
 
 const MOVEMENT_KEYS = new Set([
   "w",
@@ -590,7 +590,7 @@ export default function DriveVerseShowcase({
           <div
             className="h-full rounded-full bg-gradient-to-r from-[#4bf1fa] to-[#eaea50] transition-[width] duration-100"
             style={{
-              width: `${Math.min((speedKmh / 216) * 100, 100)}%`,
+              width: `${Math.min((speedKmh / 270) * 100, 100)}%`,
             }}
           />
         </div>
