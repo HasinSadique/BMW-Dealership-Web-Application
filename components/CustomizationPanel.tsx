@@ -118,7 +118,7 @@ export default function CustomizationPanel({
               href={driveAwayHref}
               className="block w-full rounded-xl bg-gradient-to-r from-[#2f7de1] to-[#65b7ff] px-4 py-3 text-center text-sm font-bold uppercase tracking-[0.18em] text-white shadow-[0_16px_40px_rgba(47,125,225,0.35)] transition hover:translate-y-[-1px] hover:shadow-[0_20px_48px_rgba(101,183,255,0.42)]"
             >
-              Drive Away
+              Book Test Drive
             </Link>
           </section>
 

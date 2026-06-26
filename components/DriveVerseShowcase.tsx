@@ -50,6 +50,11 @@ const MAX_SPEED = 30;
 const MAX_REVERSE = 10;
 const ACCELERATION = 8;
 const BRAKE_FORCE = 32;
+const HANDBRAKE_FORCE = 58;
+const HANDBRAKE_YAW_MULT = 3.4;
+const HANDBRAKE_DRIFT_SPEED_DECAY = 5.2;
+const HANDBRAKE_PIVOT_RATE = 4.2;
+const HANDBRAKE_MIN_DRIFT_SPEED = 0.7;
 const COAST_DRAG = 2.2;
 const STEER_ANGLE = (42 * Math.PI) / 180;
 const STEER_SPEED = 3.2;
@@ -65,6 +70,7 @@ const CAM_LOOK_FORWARD = 5.5;
 const CAM_LOOK_HEIGHT = 1.1;
 const CAM_SPEED_PULLBACK = 3.2;
 const SPEED_TO_KMH = 270 / MAX_SPEED;
+const CAR_COLLISION_RADIUS = 1.25;
 
 const MOVEMENT_KEYS = new Set([
   "w",
@@ -98,12 +104,21 @@ export default function DriveVerseShowcase({
 
     const pressedKeys = new Set<string>();
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Space" || event.key === " ") {
+        event.preventDefault();
+        pressedKeys.add(" ");
+        return;
+      }
       const key = event.key.toLowerCase();
       if (!MOVEMENT_KEYS.has(key)) return;
       event.preventDefault();
       pressedKeys.add(key);
     };
     const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === "Space" || event.key === " ") {
+        pressedKeys.delete(" ");
+        return;
+      }
       pressedKeys.delete(event.key.toLowerCase());
     };
     const onBlur = () => pressedKeys.clear();
@@ -169,6 +184,7 @@ export default function DriveVerseShowcase({
 
     const trackMeshes: THREE.Mesh[] = [];
     let roadMeshes: THREE.Mesh[] = [];
+    let treeColliders: TreeCollider[] = [];
     const groundRay = new THREE.Raycaster();
     const rayOrigin = new THREE.Vector3();
     const downVector = new THREE.Vector3(0, -1, 0);
@@ -230,7 +246,9 @@ export default function DriveVerseShowcase({
           }
         });
 
-        roadMeshes = prepareTrackMeshes(trackMeshes);
+        const preparedTrack = prepareTrackMeshes(trackMeshes);
+        roadMeshes = preparedTrack.road;
+        treeColliders = buildTreeColliders(preparedTrack.trees);
         trackRoot.add(track);
 
         const trackBox = new THREE.Box3().setFromObject(track);
@@ -315,9 +333,22 @@ export default function DriveVerseShowcase({
       const backward = pressedKeys.has("s") || pressedKeys.has("arrowdown");
       const steerLeft = pressedKeys.has("a") || pressedKeys.has("arrowleft");
       const steerRight = pressedKeys.has("d") || pressedKeys.has("arrowright");
+      const handbrake = pressedKeys.has(" ");
       const throttle = forward ? 1 : backward ? -1 : 0;
 
-      if (throttle > 0) {
+      if (handbrake) {
+        const handbrakeDrag = HANDBRAKE_FORCE * dt;
+        if (Math.abs(velocity) <= handbrakeDrag) velocity = 0;
+        else velocity -= Math.sign(velocity) * handbrakeDrag;
+
+        if (throttle > 0) {
+          if (velocity < 0) velocity += BRAKE_FORCE * 0.45 * dt;
+          else velocity += ACCELERATION * 0.3 * dt;
+        } else if (throttle < 0) {
+          if (velocity > 0) velocity -= BRAKE_FORCE * 0.45 * dt;
+          else velocity -= ACCELERATION * 0.22 * dt;
+        }
+      } else if (throttle > 0) {
         if (velocity < 0) velocity += BRAKE_FORCE * dt;
         else velocity += ACCELERATION * dt;
       } else if (throttle < 0) {
@@ -356,15 +387,37 @@ export default function DriveVerseShowcase({
           targetYawRate *= -1;
         }
 
-        if (speedAbs < 2.8 && throttle !== 0) {
+        if (handbrake && speedAbs > HANDBRAKE_MIN_DRIFT_SPEED) {
+          const driftFactor = THREE.MathUtils.clamp(
+            speedAbs / (MAX_SPEED * 0.5),
+            0.35,
+            1,
+          );
+          targetYawRate =
+            steerInput *
+            driftFactor *
+            HANDBRAKE_YAW_MULT *
+            MAX_YAW_RATE *
+            Math.sign(velocity || throttle || 1);
+
+          const driftDecay =
+            HANDBRAKE_DRIFT_SPEED_DECAY * Math.abs(steerInput) * dt;
+          if (speedAbs <= driftDecay) velocity = 0;
+          else velocity -= Math.sign(velocity) * driftDecay;
+        } else if (handbrake && speedAbs <= HANDBRAKE_MIN_DRIFT_SPEED) {
+          targetYawRate =
+            steerInput *
+            HANDBRAKE_PIVOT_RATE *
+            (throttle !== 0 ? Math.sign(throttle) : 1);
+        } else if (speedAbs < 2.8 && throttle !== 0) {
           targetYawRate =
             steerInput * GTA_LOW_SPEED_PIVOT * Math.sign(throttle);
         }
 
         targetYawRate = THREE.MathUtils.clamp(
           targetYawRate,
-          -MAX_YAW_RATE,
-          MAX_YAW_RATE,
+          handbrake ? -MAX_YAW_RATE * 1.35 : -MAX_YAW_RATE,
+          handbrake ? MAX_YAW_RATE * 1.35 : MAX_YAW_RATE,
         );
 
         const yawRateDelta = targetYawRate - yawRate;
@@ -407,9 +460,37 @@ export default function DriveVerseShowcase({
           upNormal,
         );
 
-        if (constrained.blocked) {
-          carPosition.x = constrained.x;
-          carPosition.z = constrained.z;
+        carPosition.x = constrained.x;
+        carPosition.z = constrained.z;
+
+        const treeHit = resolveTreeCollisions(
+          carPosition.x,
+          carPosition.z,
+          prevX,
+          prevZ,
+          treeColliders,
+          CAR_COLLISION_RADIUS,
+        );
+
+        carPosition.x = treeHit.x;
+        carPosition.z = treeHit.z;
+
+        const afterTrees = constrainCarPosition(
+          carPosition.x,
+          carPosition.z,
+          prevX,
+          prevZ,
+          roadMeshes,
+          groundRay,
+          rayOrigin,
+          downVector,
+          upNormal,
+        );
+
+        carPosition.x = afterTrees.x;
+        carPosition.z = afterTrees.z;
+
+        if (treeHit.blocked || constrained.blocked || afterTrees.blocked) {
           velocity *= 0.28;
         }
 
@@ -437,19 +518,25 @@ export default function DriveVerseShowcase({
 
       const steerNorm = currentSteerAngle / STEER_ANGLE;
       const speedNorm = velocity / MAX_SPEED;
+      const handbrakeSlide =
+        handbrake && Math.abs(velocity) > 1 && Math.abs(steerNorm) > 0.05;
       const targetBodyRoll = THREE.MathUtils.clamp(
-        -steerNorm * speedNorm * 0.22,
-        -0.18,
-        0.18,
+        -steerNorm * speedNorm * (handbrakeSlide ? 0.38 : 0.22),
+        handbrakeSlide ? -0.28 : -0.18,
+        handbrakeSlide ? 0.28 : 0.18,
       );
 
       let targetBodyPitch = 0;
-      if (throttle > 0 && velocity >= 0) {
+      if (handbrakeSlide) {
+        targetBodyPitch = 0.05;
+      } else if (throttle > 0 && velocity >= 0) {
         targetBodyPitch = -0.05 * (1 - Math.abs(speedNorm) * 0.5);
       } else if (throttle < 0 && velocity > 0.5) {
         targetBodyPitch = 0.07;
       } else if (throttle < 0 && velocity < 0) {
         targetBodyPitch = 0.035;
+      } else if (handbrake && Math.abs(velocity) > 0.5) {
+        targetBodyPitch = 0.06;
       }
 
       bodyRoll = THREE.MathUtils.lerp(bodyRoll, targetBodyRoll, 0.14);
@@ -563,7 +650,7 @@ export default function DriveVerseShowcase({
         
       </div> */}
 
-      <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 rounded-xl border border-white/10 bg-black/50 px-5 py-3 text-center shadow-lg backdrop-blur">
+      <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-xl border border-white/10 bg-black/50 px-5 py-3 text-center shadow-lg backdrop-blur">
         <p className="m-0 text-xs uppercase tracking-[0.18em] text-slate-400">
           Controls
         </p>
@@ -575,6 +662,8 @@ export default function DriveVerseShowcase({
           <span className="font-semibold text-white">A / ←</span> Steer Left
           {" · "}
           <span className="font-semibold text-white">D / →</span> Steer Right
+          {" · "}
+          <span className="font-semibold text-white">Space</span> Handbrake
         </p>
       </div>
 
@@ -628,7 +717,18 @@ type TrackSpawn = {
   heading: number;
 };
 
-function prepareTrackMeshes(meshes: THREE.Mesh[]) {
+type TreeCollider = {
+  x: number;
+  z: number;
+  radius: number;
+};
+
+type PreparedTrackMeshes = {
+  road: THREE.Mesh[];
+  trees: THREE.Mesh[];
+};
+
+function prepareTrackMeshes(meshes: THREE.Mesh[]): PreparedTrackMeshes {
   const metrics = meshes.map((mesh) => {
     mesh.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(mesh);
@@ -646,8 +746,20 @@ function prepareTrackMeshes(meshes: THREE.Mesh[]) {
     0.0001,
   );
   const road: THREE.Mesh[] = [];
+  const trees: THREE.Mesh[] = [];
 
   for (const entry of metrics) {
+    const name = getTrackMeshSearchName(entry.mesh);
+
+    if (isVegetationLikeName(name)) {
+      entry.mesh.visible = true;
+      entry.mesh.castShadow = true;
+      entry.mesh.receiveShadow = true;
+      ensureAncestorsVisible(entry.mesh);
+      trees.push(entry.mesh);
+      continue;
+    }
+
     if (shouldKeepRoadMesh(entry, maxFootprint)) {
       entry.mesh.visible = true;
       entry.mesh.castShadow = true;
@@ -670,7 +782,65 @@ function prepareTrackMeshes(meshes: THREE.Mesh[]) {
     }
   }
 
-  return road;
+  return { road, trees };
+}
+
+function buildTreeColliders(meshes: THREE.Mesh[]): TreeCollider[] {
+  return meshes.map((mesh) => {
+    mesh.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(mesh);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const radius = Math.max(size.x, size.z) * 0.4 + 0.12;
+
+    return { x: center.x, z: center.z, radius };
+  });
+}
+
+function resolveTreeCollisions(
+  x: number,
+  z: number,
+  prevX: number,
+  prevZ: number,
+  colliders: TreeCollider[],
+  carRadius: number,
+) {
+  if (!colliders.length) {
+    return { x, z, blocked: false };
+  }
+
+  let nextX = x;
+  let nextZ = z;
+  let blocked = false;
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    let pushed = false;
+
+    for (const tree of colliders) {
+      const dx = nextX - tree.x;
+      const dz = nextZ - tree.z;
+      const minDist = carRadius + tree.radius;
+      const distSq = dx * dx + dz * dz;
+
+      if (distSq >= minDist * minDist) continue;
+
+      blocked = true;
+      pushed = true;
+
+      if (distSq < 1e-6) {
+        return { x: prevX, z: prevZ, blocked: true };
+      }
+
+      const dist = Math.sqrt(distSq);
+      const overlap = minDist - dist;
+      nextX += (dx / dist) * overlap;
+      nextZ += (dz / dist) * overlap;
+    }
+
+    if (!pushed) break;
+  }
+
+  return { x: nextX, z: nextZ, blocked };
 }
 
 type TrackMeshMetrics = {
@@ -737,7 +907,36 @@ function getTrackMeshSearchName(mesh: THREE.Mesh) {
   const materialNames = materials
     .map((material) => material?.name || "")
     .join(" ");
-  return `${mesh.name || ""} ${materialNames}`.toLowerCase();
+  const ancestorNames: string[] = [];
+  let current: THREE.Object3D | null = mesh.parent;
+
+  while (current) {
+    if (current.name) ancestorNames.push(current.name);
+    current = current.parent;
+  }
+
+  return `${mesh.name || ""} ${ancestorNames.join(" ")} ${materialNames}`.toLowerCase();
+}
+
+function isVegetationLikeName(name: string) {
+  return (
+    name.includes("bush") ||
+    name.includes("tree") ||
+    name.includes("plant") ||
+    name.includes("foliage") ||
+    name.includes("vegetation") ||
+    name.includes("leafs") ||
+    name.includes("leaves")
+  );
+}
+
+function ensureAncestorsVisible(object: THREE.Object3D) {
+  let current: THREE.Object3D | null = object.parent;
+
+  while (current) {
+    current.visible = true;
+    current = current.parent;
+  }
 }
 
 function isFenceLikeName(name: string) {

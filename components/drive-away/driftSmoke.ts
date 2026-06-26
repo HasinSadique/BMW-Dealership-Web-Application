@@ -86,7 +86,9 @@ export function spawnDriftSmoke(
   time: number,
 ) {
   const forward = getForwardFromHeading(heading);
-  const rearAxle = position.clone().addScaledVector(forward, -SMOKE_REAR_OFFSET);
+  const rearAxle = position
+    .clone()
+    .addScaledVector(forward, -SMOKE_REAR_OFFSET);
   const lateral = new THREE.Vector3(forward.z, 0, -forward.x);
   const smokeDrift = forward.clone().multiplyScalar(-0.7);
 
